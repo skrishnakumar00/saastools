@@ -1,0 +1,353 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>QR label maker — Mini's Homely Masalas</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;1,9..144,500&family=Work+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#FBF6EC; --bg-alt:#F4E9D3; --paper:#FFFDF8;
+    --ink:#2B1B12; --ink-soft:#6B5847;
+    --brand-dark:#241811; --brand-orange:#D98F3E;
+    --line: rgba(43,27,18,.14);
+  }
+  *{ box-sizing:border-box; }
+  body{
+    margin:0; background:var(--bg); color:var(--ink);
+    font-family:'Work Sans', -apple-system, sans-serif;
+    min-height:100vh;
+  }
+  .topband{ background:var(--brand-dark); color:#FBF2E4; padding:18px 20px; }
+  .topband h1{
+    max-width:640px; margin:0 auto; font-family:'Fraunces', serif;
+    font-weight:600; font-size:19px;
+  }
+  .wrap{ max-width:640px; margin:0 auto; padding:24px 20px 64px; display:grid; gap:24px; }
+
+  label{ display:block; font-size:12.5px; font-weight:600; color:var(--ink-soft); margin-bottom:5px; }
+  input[type=text]{
+    width:100%; font-size:15px; font-family:inherit;
+    padding:10px 12px; border:1px solid var(--line); border-radius:10px;
+    background:var(--paper); color:var(--ink);
+  }
+  .field{ margin-bottom:14px; }
+  .field-row{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  .swatch-row{ display:flex; gap:8px; align-items:center; }
+  input[type=color]{ width:34px; height:34px; border:1px solid var(--line); border-radius:8px; padding:2px; background:var(--paper); }
+
+  .card{
+    background:var(--paper); border:1px solid var(--line); border-radius:16px;
+    padding:20px; box-shadow:0 2px 0 rgba(43,27,18,.05), 0 10px 24px -14px rgba(43,27,18,.3);
+  }
+  .card h2{ font-family:'Fraunces', serif; font-weight:500; font-style:italic; font-size:17px; margin:0 0 6px; }
+  .card p.lead{ font-size:13.5px; color:var(--ink-soft); margin:0 0 16px; line-height:1.55; }
+
+  .step-num{
+    display:inline-flex; align-items:center; justify-content:center;
+    width:20px; height:20px; border-radius:50%;
+    background:var(--brand-orange); color:#3A2308;
+    font-size:11.5px; font-weight:700; margin-right:6px;
+  }
+
+  a.ext-link{ color:var(--brand-dark); font-weight:600; text-decoration:underline; }
+
+  .upload-zone{
+    border:1.5px dashed var(--line); border-radius:12px;
+    padding:20px; text-align:center; cursor:pointer;
+    background:var(--bg-alt); font-size:13.5px; color:var(--ink-soft);
+  }
+  .upload-zone.has-file{ border-style:solid; }
+  input[type=file]{ display:none; }
+
+  .preview-shell{ display:flex; justify-content:center; padding:8px 0 4px; }
+  #outCanvas{ max-width:100%; height:auto; border-radius:12px; }
+  .empty-note{ text-align:center; color:var(--ink-soft); font-size:13.5px; padding:40px 20px; }
+
+  .btn{
+    display:inline-flex; align-items:center; justify-content:center; gap:8px;
+    width:100%; padding:13px; border:none; border-radius:10px;
+    background:var(--brand-dark); color:#FBF2E4;
+    font-family:inherit; font-size:14.5px; font-weight:600;
+    cursor:pointer; margin-top:16px;
+  }
+  .btn:disabled{ opacity:.4; cursor:not-allowed; }
+  .btn:active:not(:disabled){ opacity:.85; }
+  .hint{ font-size:12.5px; color:var(--ink-soft); margin-top:8px; line-height:1.5; }
+</style>
+</head>
+<body>
+
+<div class="topband"><h1>QR label maker</h1></div>
+
+<div class="wrap">
+
+  <div class="card">
+    <h2>1. Generate your plain QR code</h2>
+    <p class="lead">
+      <span class="step-num">1</span>Go to
+      <a class="ext-link" href="https://www.qr-code-generator.com" target="_blank" rel="noopener">qr-code-generator.com</a>
+      and create a code pointing to your page link, then download the PNG.<br/><br/>
+      <span class="step-num">2</span>Come back here and upload that PNG below — this tool only adds your header and footer text around it, it doesn't generate the code itself.
+    </p>
+  </div>
+
+  <div class="card">
+    <h2>2. Upload it, and add your text</h2>
+
+    <div class="field">
+      <label for="logoInput">Your logo (optional)</label>
+      <div class="upload-zone" id="logoZone">
+        <span id="logoZoneLabel">Click to choose a PNG (transparent background works best)</span>
+      </div>
+      <input type="file" id="logoInput" accept="image/*" />
+    </div>
+
+    <div class="field">
+      <label for="fileInput">Your QR code image</label>
+      <div class="upload-zone" id="dropZone">
+        <span id="dropZoneLabel">Click to choose a PNG or JPG</span>
+      </div>
+      <input type="file" id="fileInput" accept="image/*" />
+    </div>
+
+    <div class="field">
+      <label for="header">Header text (shown above the code)</label>
+      <input type="text" id="header" value="Mini's Homely Masalas" />
+    </div>
+
+    <div class="field">
+      <label for="scanCue">Scan cue (short, sits just above the code)</label>
+      <input type="text" id="scanCue" value="📱 Scan me" />
+    </div>
+
+    <div class="field">
+      <label for="footer">Footer text (shown below the code)</label>
+      <input type="text" id="footer" value="Scan for preparation instructions & recipe videos" />
+    </div>
+
+    <div class="field-row">
+      <div class="field">
+        <label>Text color</label>
+        <div class="swatch-row">
+          <input type="color" id="fgColor" value="#241811" />
+          <span class="hint" id="fgHex">#241811</span>
+        </div>
+      </div>
+      <div class="field">
+        <label>Background</label>
+        <div class="swatch-row">
+          <input type="color" id="bgColor" value="#fbf6ec" />
+          <span class="hint" id="bgHex">#fbf6ec</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Preview</h2>
+    <div class="preview-shell">
+      <canvas id="outCanvas" style="display:none;"></canvas>
+      <p class="empty-note" id="emptyNote">Upload your QR code image above to see the preview here.</p>
+    </div>
+    <button class="btn" id="downloadBtn" disabled>Download as PNG</button>
+    <p class="hint">Downloads at print resolution. Test-scan the on-screen preview with your phone before you print.</p>
+  </div>
+
+</div>
+
+<script>
+const fileInput = document.getElementById("fileInput");
+const dropZone = document.getElementById("dropZone");
+const dropZoneLabel = document.getElementById("dropZoneLabel");
+const logoInput = document.getElementById("logoInput");
+const logoZone = document.getElementById("logoZone");
+const logoZoneLabel = document.getElementById("logoZoneLabel");
+const headerInput = document.getElementById("header");
+const scanCueInput = document.getElementById("scanCue");
+const footerInput = document.getElementById("footer");
+const fgColor = document.getElementById("fgColor");
+const bgColor = document.getElementById("bgColor");
+const fgHex = document.getElementById("fgHex");
+const bgHex = document.getElementById("bgHex");
+const canvas = document.getElementById("outCanvas");
+const ctx = canvas.getContext("2d");
+const emptyNote = document.getElementById("emptyNote");
+const downloadBtn = document.getElementById("downloadBtn");
+
+const SCALE = 2;
+const DESIGN_W = 640;
+const QR_SIZE = 380;
+const PAD = 40;
+
+let qrImage = null;
+let logoImage = null;
+
+logoZone.addEventListener("click", () => logoInput.click());
+
+logoInput.addEventListener("change", () => {
+  const file = logoInput.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const img = new Image();
+    img.onload = () => {
+      logoImage = img;
+      logoZone.classList.add("has-file");
+      logoZoneLabel.textContent = "Uploaded: " + file.name;
+      render();
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+});
+
+dropZone.addEventListener("click", () => fileInput.click());
+
+fileInput.addEventListener("change", () => {
+  const file = fileInput.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const img = new Image();
+    img.onload = () => {
+      qrImage = img;
+      dropZone.classList.add("has-file");
+      dropZoneLabel.textContent = "Uploaded: " + file.name;
+      downloadBtn.disabled = false;
+      render();
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+});
+
+function wrapText(context, text, maxWidth) {
+  const words = text.split(" ");
+  const lines = [];
+  let line = "";
+  for (const word of words) {
+    const test = line ? line + " " + word : word;
+    if (context.measureText(test).width > maxWidth && line) {
+      lines.push(line);
+      line = word;
+    } else {
+      line = test;
+    }
+  }
+  if (line) lines.push(line);
+  return lines;
+}
+
+function render() {
+  if (!qrImage) return;
+
+  const headerText = headerInput.value.trim();
+  const scanCueText = scanCueInput.value.trim();
+  const footerText = footerInput.value.trim();
+  const fg = fgColor.value;
+  const bg = bgColor.value;
+
+  const measureCtx = document.createElement("canvas").getContext("2d");
+  measureCtx.font = "600 26px Fraunces, serif";
+  const headerLines = headerText ? wrapText(measureCtx, headerText, DESIGN_W - PAD * 2) : [];
+  measureCtx.font = "500 16px 'Work Sans', sans-serif";
+  const footerLines = footerText ? wrapText(measureCtx, footerText, DESIGN_W - PAD * 2) : [];
+
+  const LOGO_SIZE = 64;
+  const logoH = logoImage ? LOGO_SIZE + 18 : 0;
+  const headerH = headerLines.length ? headerLines.length * 34 + 26 : 10;
+  const scanCueH = scanCueText ? 34 : 0;
+  const footerH = footerLines.length ? footerLines.length * 24 + 30 : 10;
+  const designH = logoH + headerH + scanCueH + QR_SIZE + footerH + PAD;
+
+  canvas.width = DESIGN_W * SCALE;
+  canvas.height = designH * SCALE;
+  canvas.style.width = DESIGN_W + "px";
+  canvas.style.height = designH + "px";
+  ctx.setTransform(SCALE, 0, 0, SCALE, 0, 0);
+
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, DESIGN_W, designH);
+
+  let y = 30;
+
+  if (logoImage) {
+    const lx = (DESIGN_W - LOGO_SIZE) / 2;
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(DESIGN_W / 2, y + LOGO_SIZE / 2, LOGO_SIZE / 2, 0, Math.PI * 2);
+    ctx.closePath();
+    ctx.clip();
+    ctx.drawImage(logoImage, lx, y, LOGO_SIZE, LOGO_SIZE);
+    ctx.restore();
+    y += LOGO_SIZE + 18;
+  }
+
+  if (headerLines.length) {
+    ctx.fillStyle = fg;
+    ctx.font = "600 26px Fraunces, serif";
+    ctx.textAlign = "center";
+    for (const line of headerLines) {
+      y += 30;
+      ctx.fillText(line, DESIGN_W / 2, y);
+    }
+    y += 20;
+  } else {
+    y += headerH;
+  }
+
+  if (scanCueText) {
+    ctx.fillStyle = fg;
+    ctx.font = "600 15px 'Work Sans', sans-serif";
+    ctx.textAlign = "center";
+    y += 22;
+    ctx.fillText(scanCueText, DESIGN_W / 2, y);
+    y += 12;
+  }
+
+  const qrX = (DESIGN_W - QR_SIZE) / 2;
+  ctx.fillStyle = bg;
+  ctx.fillRect(qrX, y, QR_SIZE, QR_SIZE);
+  ctx.drawImage(qrImage, qrX, y, QR_SIZE, QR_SIZE);
+  y += QR_SIZE + 30;
+
+  if (footerLines.length) {
+    ctx.fillStyle = fg;
+    ctx.font = "italic 500 16px Fraunces, serif";
+    ctx.textAlign = "center";
+    for (const line of footerLines) {
+      y += 24;
+      ctx.fillText(line, DESIGN_W / 2, y);
+    }
+  }
+
+  canvas.style.display = "block";
+  emptyNote.style.display = "none";
+}
+
+function syncHexLabel() {
+  fgHex.textContent = fgColor.value;
+  bgHex.textContent = bgColor.value;
+}
+
+[headerInput, scanCueInput, footerInput, fgColor, bgColor].forEach(el => {
+  el.addEventListener("input", () => { syncHexLabel(); render(); });
+  el.addEventListener("change", () => { syncHexLabel(); render(); });
+});
+
+downloadBtn.addEventListener("click", () => {
+  if (!qrImage) return;
+  const link = document.createElement("a");
+  const name = (headerInput.value.trim() || "qr-code").toLowerCase().replace(/[^a-z0-9]+/g, "-");
+  link.download = `${name}-qr.png`;
+  link.href = canvas.toDataURL("image/png");
+  link.click();
+});
+
+syncHexLabel();
+</script>
+</body>
+</html>
