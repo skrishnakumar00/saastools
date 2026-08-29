@@ -296,6 +296,13 @@ select.status-pill:focus { outline: 2px solid var(--teal); outline-offset: 1px; 
 .save-flash.show { opacity: 1; }
 .save-err { font-size: 11px; color: var(--coral); margin-top: 4px; }
 
+.field-editable { display: inline-flex; align-items: center; gap: 5px; flex-wrap: wrap; }
+.field-save-state { font-size: 9.5px; font-weight: 700; white-space: nowrap; }
+.field-save-state.fss-saving { color: var(--muted); }
+.field-save-state.fss-ok { color: #2e7d4f; opacity: 0; transition: opacity 0.3s; }
+.field-save-state.fss-ok.show { opacity: 1; }
+.field-save-state.fss-err { color: var(--coral); cursor: pointer; text-decoration: underline dotted; text-underline-offset: 2px; }
+
 .pri-pill { padding: 1px 7px; border-radius: 10px; font-size: 10px; font-weight: 600; white-space: nowrap; }
 .pr-High   { background: #fde8e8; color: #c53030; }
 .pr-Medium { background: #fef3d0; color: #9c6900; }
@@ -587,7 +594,7 @@ body.hide-owner .col-owner { display: none !important; }
   <div class="tbl-wrap" id="tbl-wrap">
     <div class="quick-add-bar" id="quick-add-bar" style="display:none;">
       <input type="text" class="quick-add-input" id="qa-task-input" placeholder="+ Jot down a new task…">
-      <button class="quick-add-btn" onclick="quickAddTask()">Add</button>
+      <button class="quick-add-btn" id="qa-add-btn" onclick="quickAddTask()">Add</button>
       <span class="quick-add-full-link" onclick="openAddModal()">+ full details</span>
     </div>
     <div class="tbl-toolbar">
@@ -1285,13 +1292,19 @@ function toISO(d) {
 }
 
 // Status pill: a real <select> when the row can be safely targeted for a
-// write (EDITABLE + has a Sr No) — same visual pill, just tappable.
+// write (EDITABLE + has a Sr No) — same visual pill, just tappable. A tiny
+// inline save-state indicator sits right next to it, anchored to this
+// exact field, so save/fail feedback can never be missed the way a toast
+// that disappears on its own can be.
 function statusControl(t) {
   if (!EDITABLE || !t.srno) {
     return `<span class="status-pill sp-${t.status}"><span class="s-dot"></span>${t.status}</span>`;
   }
   const opts = STATUS_OPTIONS.map(s => `<option value="${s}" ${s===t.status?'selected':''}>${s}</option>`).join('');
-  return `<select class="status-pill sp-${t.status}" onclick="event.stopPropagation()" onchange="handleStatusChange(this,${JSON.stringify(t.srno)})">${opts}</select>`;
+  return `<span class="field-editable">
+    <select id="sel-status-${t.srno}" class="status-pill sp-${t.status}" onclick="event.stopPropagation()" onchange="handleStatusChange(this,${JSON.stringify(t.srno)})">${opts}</select>
+    <span class="field-save-state" id="ss-status-${t.srno}"></span>
+  </span>`;
 }
 
 // Revised Date: a real date input when editable (desktop table only — kept
@@ -1300,55 +1313,117 @@ function statusControl(t) {
 function revisedControl(t) {
   const revTxt = t.revised && !isNaN(t.revised) ? fmt(t.revised) : '—';
   if (!EDITABLE || !t.srno) return revTxt;
-  return `<input type="date" class="rev-date-input" value="${toISO(t.revised)}" onclick="event.stopPropagation()" onchange="handleRevisedChange(this,${JSON.stringify(t.srno)})">`;
+  return `<span class="field-editable">
+    <input type="date" class="rev-date-input" value="${toISO(t.revised)}" onclick="event.stopPropagation()" onchange="handleRevisedChange(this,${JSON.stringify(t.srno)})">
+    <span class="field-save-state" id="ss-revised-${t.srno}"></span>
+  </span>`;
 }
 
-async function handleStatusChange(selectEl, srno) {
-  const newVal = selectEl.value;
-  const t = ALL.find(x => String(x.srno) === String(srno));
-  if (!t) return;
-  const oldVal = t.status;
-  t.status = newVal;
-  render();
-  const res = await updateTask(srno, { status: newVal });
-  if (!res.success) {
-    t.status = oldVal;
-    render();
-    showToast('Could not save status: ' + (res.error || 'unknown error'), true);
-  } else {
-    showToast('Status updated ✓', false);
+// ── COALESCED AUTO-SAVE ──────────────────────────────────────────────────
+// Handles the case where someone changes the same field twice in quick
+// succession (taps the wrong status, immediately corrects it). Rather than
+// letting two overlapping save requests race — where a slower first request
+// could land after and overwrite the correction — this keeps only the
+// latest desired value and saves it once the previous save finishes, never
+// dropping a change and never sending a stale one.
+const _fieldSaves = {};
+async function saveField(key, stateElId, latestValue, doSave) {
+  const state = _fieldSaves[key] || (_fieldSaves[key] = { inFlight: false, pending: undefined });
+  state.pending = latestValue;
+  if (state.inFlight) return;
+  state.inFlight = true;
+
+  while (state.pending !== undefined) {
+    const value = state.pending;
+    state.pending = undefined;
+    const stateEl = document.getElementById(stateElId);
+    if (stateEl) { stateEl.textContent = 'Saving…'; stateEl.className = 'field-save-state fss-saving'; stateEl.onclick = null; }
+
+    const res = await doSave(value);
+    const el = document.getElementById(stateElId); // re-fetch: DOM may have changed while awaiting
+    if (el) {
+      if (res.success) {
+        el.textContent = 'Saved ✓';
+        el.className = 'field-save-state fss-ok show';
+        setTimeout(() => { if (el.classList.contains('fss-ok')) el.classList.remove('show'); }, 1800);
+      } else {
+        el.textContent = '⚠ Not saved — tap to retry';
+        el.className = 'field-save-state fss-err';
+        el.onclick = () => saveField(key, stateElId, value, doSave);
+      }
+    }
   }
+  state.inFlight = false;
 }
 
-async function handleRevisedChange(inputEl, srno) {
-  const newVal = inputEl.value; // 'YYYY-MM-DD' or ''
+// Updates KPI/Breakdown/Parked counts only — NOT the task table itself —
+// so an in-progress inline edit (open dropdown, save-state message) is
+// never disrupted by a full re-render while someone's mid-action.
+function refreshAggregatesOnly() {
+  const kt = kpiTasks();
+  renderKPIs(kt);
+  renderBreakdown(kt, document.getElementById('f-owner').value);
+  const parkedCount = ALL.filter(t=>t.status==='Parked').length;
+  document.getElementById('parked-count').textContent = parkedCount;
+  document.getElementById('parked-link-row').style.display = parkedCount>0 ? 'flex' : 'none';
+}
+
+function handleStatusChange(selectEl, srno) {
   const t = ALL.find(x => String(x.srno) === String(srno));
   if (!t) return;
-  const oldVal = t.revised;
-  t.revised = newVal ? toDate(newVal) : null;
-  render();
-  const res = await updateTask(srno, { revised: newVal });
-  if (!res.success) {
-    t.revised = oldVal;
-    render();
-    showToast('Could not save date: ' + (res.error || 'unknown error'), true);
-  } else {
-    showToast('Revised date updated ✓', false);
-  }
+  saveField('status-'+srno, 'ss-status-'+srno, selectEl.value, async (val) => {
+    t.status = val;
+    selectEl.className = 'status-pill sp-' + val;
+    refreshAggregatesOnly();
+    return updateTask(srno, { status: val });
+  });
+}
+
+function handleRevisedChange(inputEl, srno) {
+  const t = ALL.find(x => String(x.srno) === String(srno));
+  if (!t) return;
+  saveField('revised-'+srno, 'ss-revised-'+srno, inputEl.value, async (val) => {
+    t.revised = val ? toDate(val) : null;
+    return updateTask(srno, { revised: val });
+  });
 }
 
 // ── QUICK ADD ─────────────────────────────────────────────────────────────
+// Adds the new task straight into the local list using the values we just
+// sent (and the Sr No the backend confirms), rather than re-fetching
+// everything from the sheet — faster, and immune to any read-after-write
+// timing gap right after the save.
+function applyNewTaskLocally(fields, srNo) {
+  const newTask = {
+    srno: (srNo !== null && srNo !== undefined) ? String(srNo) : '',
+    cat: fields.cat || '',
+    task: fields.task,
+    priority: fields.priority || '',
+    owner: fields.owner || '',
+    due: fields.due ? toDate(fields.due) : null,
+    revised: null,
+    status: fields.status || 'Pending',
+    remarks: fields.remarks || '',
+    extraVals: EXTRA.map(() => ''),
+  };
+  ALL.push(newTask);
+  buildFilters();
+  render();
+}
+
 async function quickAddTask() {
   const input = document.getElementById('qa-task-input');
+  const btn = document.getElementById('qa-add-btn');
   const val = input.value.trim();
   if (!val) return;
-  input.disabled = true;
-  const res = await addTask({ task: val, status: 'Pending' });
-  input.disabled = false;
+  input.disabled = true; btn.disabled = true; btn.textContent = 'Saving…';
+  const fields = { task: val, status: 'Pending' };
+  const res = await addTask(fields);
+  input.disabled = false; btn.disabled = false; btn.textContent = 'Add';
   if (res.success) {
     input.value = '';
+    applyNewTaskLocally(fields, res.srNo);
     showToast('Task added ✓', false);
-    loadData();
   } else {
     showToast('Could not add task: ' + (res.error || 'unknown error'), true);
   }
@@ -1372,7 +1447,7 @@ function openAddModal() {
       <select id="am-priority"><option value="">—</option><option value="High">High</option><option value="Medium">Medium</option><option value="Low">Low</option></select>
     </div></div>
     <div class="detail-row" style="border-bottom:none;"><div class="detail-lbl"></div><div class="detail-val">
-      <button class="modal-hdr-btn" style="background:var(--teal);color:var(--white);border-color:var(--teal);" onclick="submitAddModal()">Add task</button>
+      <button class="modal-hdr-btn" id="am-submit-btn" style="background:var(--teal);color:var(--white);border-color:var(--teal);" onclick="submitAddModal()">Add task</button>
       <div class="save-err" id="am-error" style="display:none;"></div>
     </div></div>
   `;
@@ -1392,18 +1467,24 @@ async function submitAddModal() {
     priority: document.getElementById('am-priority').value,
     status: 'Pending',
   };
+  const btn = document.getElementById('am-submit-btn');
+  btn.disabled = true; btn.textContent = 'Saving…';
   const res = await addTask(fields);
   if (res.success) {
     closeModal('add-modal');
+    applyNewTaskLocally(fields, res.srNo);
     showToast('Task added ✓', false);
-    loadData();
   } else {
+    btn.disabled = false; btn.textContent = 'Add task';
     errEl.textContent = 'Could not save: ' + (res.error || 'unknown error');
     errEl.style.display = 'block';
   }
 }
 
 // ── TOAST ────────────────────────────────────────────────────────────────
+// Used only for whole-task actions (add, full edit) — never for status/date
+// inline edits, which now show their save state anchored to the field
+// itself so it can't be missed or auto-dismiss before being seen.
 function showToast(msg, isError) {
   let el = document.getElementById('toast');
   if (!el) {
