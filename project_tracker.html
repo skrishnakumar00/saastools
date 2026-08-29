@@ -119,7 +119,6 @@ main { max-width: 1160px; margin: 0 auto; padding: 24px 20px 60px; }
 .ring-count { font-size: 10.5px; color: var(--muted); margin-top: 2px; }
 .ring-check { font-size: 11px; }
 .ring-desc { font-size: 10px; color: var(--muted); margin-top: 2px; line-height: 1.4; }
-.progress-empty { font-size: 12px; color: var(--muted); padding: 6px 0; }
 .cat-mismatch-warning {
   font-size: 11.5px; color: var(--amber); background: var(--amber-light);
   border: 1px solid var(--amber-mid); border-radius: 6px;
@@ -274,19 +273,19 @@ select.status-pill:focus { outline: 2px solid var(--teal); outline-offset: 1px; 
 .rev-date-input:hover { border-color: var(--amber-mid); background: var(--amber-light); }
 .rev-date-input:focus { outline: none; border-color: var(--amber); background: var(--white); }
 
-.remarks-input {
-  border: 1px solid transparent; background: none; font-family: 'Inter', sans-serif;
-  color: var(--muted); font-size: 11.5px; padding: 3px 5px; border-radius: 4px;
-  width: 100%; min-width: 140px;
+.remarks-display {
+  display: block; cursor: pointer; border-radius: 4px; padding: 3px 5px; margin: -3px -5px;
+  min-height: 18px; transition: background 0.12s;
 }
-.remarks-input:hover { border-color: var(--border); background: var(--slate-light); }
-.remarks-input:focus { outline: none; border-color: var(--teal); background: var(--white); color: var(--text); }
+.remarks-display:hover { background: var(--slate-light); }
+.remarks-edit-input {
+  width: 100%; min-width: 160px; min-height: 52px; resize: vertical;
+  border: 1.5px solid var(--teal); border-radius: 5px; background: var(--white);
+  color: var(--text); font-family: 'Inter', sans-serif; font-size: 11.5px;
+  padding: 5px 7px; outline: none;
+}
+.remarks-err { font-size: 10px; color: var(--coral); cursor: pointer; margin-top: 3px; text-decoration: underline dotted; text-underline-offset: 2px; }
 
-.save-flash {
-  display: inline-block; font-size: 10px; font-weight: 700; color: var(--green, #2e7d4f);
-  margin-left: 6px; opacity: 0; transition: opacity 0.3s;
-}
-.save-flash.show { opacity: 1; }
 .save-err { font-size: 11px; color: var(--coral); margin-top: 4px; }
 
 .field-editable { display: inline-flex; align-items: center; gap: 5px; flex-wrap: wrap; }
@@ -307,6 +306,8 @@ select.status-pill:focus { outline: 2px solid var(--teal); outline-offset: 1px; 
 
 .td-cat   { color: var(--teal-dark); font-weight: 600; font-size: 11px; white-space: nowrap; }
 .td-task  { font-weight: 500; min-width: 160px; }
+.task-link { cursor: pointer; }
+.task-link:hover { text-decoration: underline; text-decoration-color: var(--teal); color: var(--teal-dark); }
 .td-owner { color: var(--teal-dark); font-weight: 600; white-space: nowrap; }
 .td-date  { white-space: nowrap; }
 .td-rev   { white-space: nowrap; color: var(--amber); font-weight: 500; }
@@ -681,7 +682,6 @@ function knownKeysFor(rowObj, aliasMap) {
   return known;
 }
 
-let COL = {}; // kept for compatibility with column-visibility toggles below
 let HAS = {};
 let EXTRA = []; // extra/unrecognized task columns: [{label, key}]
 let TASK_HEADER_MAP = {}; // field -> exact header text as it appears in the sheet (needed for writes)
@@ -969,7 +969,6 @@ function isNoOwner(t) {
   if (t.status === 'Done' || t.status === 'Parked') return false;
   return !t.owner;
 }
-function isNoDueDateOnly(t) { return isNoDate(t) && !isNoOwner(t); }
 function isPendingOrOngoing(t) { return t.status === 'Pending' || t.status === 'Ongoing'; }
 
 // ── FILTERS ──────────────────────────────────────────────────────────────────
@@ -1065,8 +1064,6 @@ function renderKPIs(tasks) {
   document.getElementById('k-nodate').textContent  = tasks.filter(isNoDate).length;
   document.getElementById('k-noowner').textContent = tasks.filter(isNoOwner).length;
 }
-
-function metaParts(...parts) { return parts.filter(Boolean).join(' · '); }
 
 // ── PROJECT PROGRESS (rings) ────────────────────────────────────────────────
 function ringColor(pct) {
@@ -1214,7 +1211,7 @@ function renderTaskList() {
       return `<tr class="${over?'row-overdue':''} ${parked?'row-parked':''}">
         <td class="td-cat col-cat">${esc(t.cat)||'—'}</td>
         <td class="td-task">
-          <span style="cursor:pointer;" onclick="openDetailModal(${i})">${esc(t.task)}</span>
+          <span class="task-link" onclick="openDetailModal(${i})">${esc(t.task)}</span>
           ${over  ? `<span class="tag-overdue">${days}d</span>` : ''}
           ${nodt  ? `<span class="tag-nodate">no date</span>` : ''}
           ${nown  ? `<span class="tag-noowner">no owner</span>` : ''}
@@ -1324,15 +1321,68 @@ function dueControl(t) {
   </span>`;
 }
 
-// Remarks: a plain text input (desktop table only) — multi-line editing
-// for Remarks still lives in the full task detail Edit view; this is for
-// quick corrections without opening that modal.
+// Remarks: click-to-edit. At rest it's plain wrapped text (same look as
+// before inline editing existed) — clicking it turns that exact spot into
+// a textarea; blurring saves and collapses back to wrapped text. This
+// avoids a permanently-visible single-line input forcing long remarks
+// into horizontal scroll.
 function remarksControl(t) {
   if (!EDITABLE || !t.srno) return escNl(t.remarks) || '—';
-  return `<span class="field-editable" style="width:100%;">
-    <input type="text" class="remarks-input inline-edit-ctrl" data-srno="${esc(t.srno)}" data-field="remarks" value="${esc(t.remarks)}" placeholder="—" onclick="event.stopPropagation()">
-    <span class="field-save-state" id="ss-remarks-${esc(t.srno)}"></span>
-  </span>`;
+  return remarksDisplayHTML(t);
+}
+
+function remarksDisplayHTML(t) {
+  const text = t.remarks ? escNl(t.remarks) : '<span style="color:var(--muted);">—</span>';
+  return `<span class="remarks-display" data-srno="${esc(t.srno)}" onclick="event.stopPropagation(); startRemarksEdit(this)">${text}</span><span class="field-save-state" id="ss-remarks-${esc(t.srno)}"></span>`;
+}
+
+function startRemarksEdit(spanEl) {
+  const srno = spanEl.dataset.srno;
+  const t = ALL.find(x => String(x.srno) === String(srno));
+  if (!t) return;
+  const td = spanEl.closest('td');
+  if (!td) return;
+  td.innerHTML = `<textarea class="remarks-edit-input"></textarea>`;
+  const ta = td.querySelector('textarea');
+  ta.value = t.remarks || '';
+  ta.dataset.srno = srno;
+  ta.addEventListener('click', e => e.stopPropagation());
+  ta.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); ta.blur(); }
+    else if (e.key === 'Escape') { ta.value = t.remarks || ''; ta.blur(); }
+  });
+  ta.addEventListener('blur', () => saveRemarksAndCollapse(ta));
+  ta.focus();
+  ta.setSelectionRange(ta.value.length, ta.value.length);
+}
+
+async function saveRemarksAndCollapse(ta) {
+  const srno = ta.dataset.srno;
+  const t = ALL.find(x => String(x.srno) === String(srno));
+  if (!t) return;
+  const td = ta.closest('td');
+  if (!td) return; // already collapsed
+
+  const value = ta.value;
+  if (value === (t.remarks || '')) { td.innerHTML = remarksDisplayHTML(t); return; }
+
+  ta.disabled = true;
+  const res = await updateTask(srno, { remarks: value });
+  if (res.success) {
+    t.remarks = value;
+    td.innerHTML = remarksDisplayHTML(t);
+    const stateEl = document.getElementById('ss-remarks-'+srno);
+    if (stateEl) {
+      stateEl.textContent = 'Saved ✓'; stateEl.className = 'field-save-state fss-ok show';
+      setTimeout(() => { if (stateEl) stateEl.classList.remove('show'); }, 1800);
+    }
+  } else {
+    ta.disabled = false;
+    let err = td.querySelector('.remarks-err');
+    if (!err) { err = document.createElement('div'); err.className = 'remarks-err save-err'; td.appendChild(err); }
+    err.textContent = '⚠ Not saved — tap to retry';
+    err.onclick = () => saveRemarksAndCollapse(ta);
+  }
 }
 
 // ── COALESCED AUTO-SAVE ──────────────────────────────────────────────────
@@ -1413,12 +1463,9 @@ function handleInlineFieldChange(el) {
       refreshAggregatesOnly(); // due date affects Overdue / No Due Date counts
       return updateTask(srno, { due: val });
     });
-  } else if (field === 'remarks') {
-    saveField('remarks-'+srno, stateElId, value, async (val) => {
-      t.remarks = val;
-      return updateTask(srno, { remarks: val });
-    });
   }
+  // 'remarks' is handled separately via startRemarksEdit/saveRemarksAndCollapse
+  // (click-to-edit, not a permanently-visible control), so no branch needed here.
 }
 
 // ── ADD TASK ──────────────────────────────────────────────────────────────
