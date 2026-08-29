@@ -201,26 +201,11 @@ main { max-width: 1160px; margin: 0 auto; padding: 24px 20px 60px; }
 
 /* ── TASK TABLE ── */
 .tbl-wrap { background: var(--white); border-radius: 10px; border: 1.5px solid var(--border); overflow: hidden; }
-.quick-add-bar {
-  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
-  padding: 12px 14px; background: var(--teal-light); border-bottom: 1px solid var(--border);
-}
-.quick-add-input {
-  flex: 1; min-width: 160px; border: 1.5px solid var(--border); border-radius: 6px;
-  padding: 8px 12px; font-size: 13px; font-family: 'Inter', sans-serif; outline: none;
-  background: var(--white);
-}
-.quick-add-input:focus { border-color: var(--teal); }
 .quick-add-btn {
   background: var(--teal); color: var(--white); border: none; border-radius: 6px;
   padding: 8px 16px; font-size: 12px; font-weight: 600; cursor: pointer; transition: background 0.15s;
 }
 .quick-add-btn:hover { background: var(--teal-dark); }
-.quick-add-full-link {
-  font-size: 11.5px; color: var(--teal-dark); font-weight: 600; cursor: pointer;
-  text-decoration: underline dotted; text-underline-offset: 2px; white-space: nowrap;
-}
-.quick-add-full-link:hover { color: var(--teal); }
 
 .tbl-toolbar {
   display: flex; align-items: center; gap: 10px;
@@ -288,6 +273,14 @@ select.status-pill:focus { outline: 2px solid var(--teal); outline-offset: 1px; 
 }
 .rev-date-input:hover { border-color: var(--amber-mid); background: var(--amber-light); }
 .rev-date-input:focus { outline: none; border-color: var(--amber); background: var(--white); }
+
+.remarks-input {
+  border: 1px solid transparent; background: none; font-family: 'Inter', sans-serif;
+  color: var(--muted); font-size: 11.5px; padding: 3px 5px; border-radius: 4px;
+  width: 100%; min-width: 140px;
+}
+.remarks-input:hover { border-color: var(--border); background: var(--slate-light); }
+.remarks-input:focus { outline: none; border-color: var(--teal); background: var(--white); color: var(--text); }
 
 .save-flash {
   display: inline-block; font-size: 10px; font-weight: 700; color: var(--green, #2e7d4f);
@@ -592,13 +585,9 @@ body.hide-owner .col-owner { display: none !important; }
   <!-- TASK LIST -->
   <div class="sec-label" style="margin-top:24px;">Task list</div>
   <div class="tbl-wrap" id="tbl-wrap">
-    <div class="quick-add-bar" id="quick-add-bar" style="display:none;">
-      <input type="text" class="quick-add-input" id="qa-task-input" placeholder="+ Jot down a new task…">
-      <button class="quick-add-btn" id="qa-add-btn" onclick="quickAddTask()">Add</button>
-      <span class="quick-add-full-link" onclick="openAddModal()">+ full details</span>
-    </div>
     <div class="tbl-toolbar">
       <h3 id="tbl-title">All tasks</h3>
+      <button class="quick-add-btn" id="add-task-btn" style="display:none;" onclick="openAddModal()">+ Add task</button>
       <select class="tbl-filter col-priority" id="f-pri" onchange="renderTaskList()">
         <option value="All">All priorities</option>
         <option value="High">High</option>
@@ -1065,7 +1054,7 @@ function render() {
   document.getElementById('parked-link-row').style.display = parkedCount>0 ? 'flex' : 'none';
 
   document.getElementById('tbl-title').textContent = owner==='All' ? 'All tasks' : `Tasks — ${owner}`;
-  document.getElementById('quick-add-bar').style.display = EDITABLE ? 'flex' : 'none';
+  document.getElementById('add-task-btn').style.display = EDITABLE ? 'inline-block' : 'none';
 }
 
 function renderKPIs(tasks) {
@@ -1221,7 +1210,6 @@ function renderTaskList() {
       const parked = t.status==='Parked';
       const ed   = effDate(t);
       const days = (over&&ed) ? Math.floor((TODAY-ed)/86400000) : 0;
-      const dueTxt = t.due && !isNaN(t.due) ? fmt(t.due) : `<span style="color:var(--amber);font-weight:600">No date</span>`;
       const extraCells = t.extraVals.map(v => `<td class="col-extra">${escNl(v)||'—'}</td>`).join('');
       return `<tr class="${over?'row-overdue':''} ${parked?'row-parked':''}">
         <td class="td-cat col-cat">${esc(t.cat)||'—'}</td>
@@ -1232,11 +1220,11 @@ function renderTaskList() {
           ${nown  ? `<span class="tag-noowner">no owner</span>` : ''}
         </td>
         <td class="td-owner col-owner">${esc(t.owner)||'<span style="color:var(--amber)">—</span>'}</td>
-        <td class="td-date">${dueTxt}</td>
+        <td class="td-date">${dueControl(t)}</td>
         <td class="td-rev col-revised">${revisedControl(t)}</td>
         <td class="col-priority"><span class="pri-pill pr-${t.priority}">${t.priority||'—'}</span></td>
         <td>${statusControl(t)}</td>
-        <td class="td-rem col-remarks">${escNl(t.remarks)||'—'}</td>
+        <td class="td-rem col-remarks">${remarksControl(t)}</td>
         ${extraCells}
       </tr>`;
     }).join('');
@@ -1296,26 +1284,54 @@ function toISO(d) {
 // inline save-state indicator sits right next to it, anchored to this
 // exact field, so save/fail feedback can never be missed the way a toast
 // that disappears on its own can be.
+//
+// IMPORTANT: values are passed via data-* attributes, never embedded
+// directly inside an onclick/onchange string — a task's Sr No, remarks,
+// or any other value could itself contain a quote character, which would
+// silently break the generated HTML attribute and the click/change
+// handler with it. A single delegated listener (set up once, near the
+// bottom of this file) reads these data-* attributes instead.
 function statusControl(t) {
   if (!EDITABLE || !t.srno) {
     return `<span class="status-pill sp-${t.status}"><span class="s-dot"></span>${t.status}</span>`;
   }
   const opts = STATUS_OPTIONS.map(s => `<option value="${s}" ${s===t.status?'selected':''}>${s}</option>`).join('');
   return `<span class="field-editable">
-    <select id="sel-status-${t.srno}" class="status-pill sp-${t.status}" onclick="event.stopPropagation()" onchange="handleStatusChange(this,${JSON.stringify(t.srno)})">${opts}</select>
-    <span class="field-save-state" id="ss-status-${t.srno}"></span>
+    <select class="status-pill inline-edit-ctrl sp-${t.status}" data-srno="${esc(t.srno)}" data-field="status" onclick="event.stopPropagation()">${opts}</select>
+    <span class="field-save-state" id="ss-status-${esc(t.srno)}"></span>
   </span>`;
 }
 
 // Revised Date: a real date input when editable (desktop table only — kept
-// as plain text on mobile cards/table to save space; still editable via
-// the full task detail view).
+// as plain text on mobile cards to save space; still editable via the full
+// task detail view on mobile).
 function revisedControl(t) {
   const revTxt = t.revised && !isNaN(t.revised) ? fmt(t.revised) : '—';
   if (!EDITABLE || !t.srno) return revTxt;
   return `<span class="field-editable">
-    <input type="date" class="rev-date-input" value="${toISO(t.revised)}" onclick="event.stopPropagation()" onchange="handleRevisedChange(this,${JSON.stringify(t.srno)})">
-    <span class="field-save-state" id="ss-revised-${t.srno}"></span>
+    <input type="date" class="rev-date-input inline-edit-ctrl" data-srno="${esc(t.srno)}" data-field="revised" value="${toISO(t.revised)}" onclick="event.stopPropagation()">
+    <span class="field-save-state" id="ss-revised-${esc(t.srno)}"></span>
+  </span>`;
+}
+
+// Due Date: same pattern as Revised Date (desktop table only).
+function dueControl(t) {
+  const dueTxt = t.due && !isNaN(t.due) ? fmt(t.due) : `<span style="color:var(--amber);font-weight:600">No date</span>`;
+  if (!EDITABLE || !t.srno) return dueTxt;
+  return `<span class="field-editable">
+    <input type="date" class="rev-date-input inline-edit-ctrl" data-srno="${esc(t.srno)}" data-field="due" value="${toISO(t.due)}" onclick="event.stopPropagation()">
+    <span class="field-save-state" id="ss-due-${esc(t.srno)}"></span>
+  </span>`;
+}
+
+// Remarks: a plain text input (desktop table only) — multi-line editing
+// for Remarks still lives in the full task detail Edit view; this is for
+// quick corrections without opening that modal.
+function remarksControl(t) {
+  if (!EDITABLE || !t.srno) return escNl(t.remarks) || '—';
+  return `<span class="field-editable" style="width:100%;">
+    <input type="text" class="remarks-input inline-edit-ctrl" data-srno="${esc(t.srno)}" data-field="remarks" value="${esc(t.remarks)}" placeholder="—" onclick="event.stopPropagation()">
+    <span class="field-save-state" id="ss-remarks-${esc(t.srno)}"></span>
   </span>`;
 }
 
@@ -1368,27 +1384,44 @@ function refreshAggregatesOnly() {
   document.getElementById('parked-link-row').style.display = parkedCount>0 ? 'flex' : 'none';
 }
 
-function handleStatusChange(selectEl, srno) {
+// Single handler for every inline-editable field (status, revised date,
+// due date, remarks) — routed here by the delegated listener set up in
+// the INIT section below, reading which row/field via data-* attributes.
+function handleInlineFieldChange(el) {
+  const srno = el.dataset.srno;
+  const field = el.dataset.field;
   const t = ALL.find(x => String(x.srno) === String(srno));
-  if (!t) return;
-  saveField('status-'+srno, 'ss-status-'+srno, selectEl.value, async (val) => {
-    t.status = val;
-    selectEl.className = 'status-pill sp-' + val;
-    refreshAggregatesOnly();
-    return updateTask(srno, { status: val });
-  });
+  if (!t || !field) return;
+  const stateElId = 'ss-' + field + '-' + srno;
+  const value = el.value;
+
+  if (field === 'status') {
+    saveField('status-'+srno, stateElId, value, async (val) => {
+      t.status = val;
+      el.className = 'status-pill inline-edit-ctrl sp-' + val;
+      refreshAggregatesOnly();
+      return updateTask(srno, { status: val });
+    });
+  } else if (field === 'revised') {
+    saveField('revised-'+srno, stateElId, value, async (val) => {
+      t.revised = val ? toDate(val) : null;
+      return updateTask(srno, { revised: val });
+    });
+  } else if (field === 'due') {
+    saveField('due-'+srno, stateElId, value, async (val) => {
+      t.due = val ? toDate(val) : null;
+      refreshAggregatesOnly(); // due date affects Overdue / No Due Date counts
+      return updateTask(srno, { due: val });
+    });
+  } else if (field === 'remarks') {
+    saveField('remarks-'+srno, stateElId, value, async (val) => {
+      t.remarks = val;
+      return updateTask(srno, { remarks: val });
+    });
+  }
 }
 
-function handleRevisedChange(inputEl, srno) {
-  const t = ALL.find(x => String(x.srno) === String(srno));
-  if (!t) return;
-  saveField('revised-'+srno, 'ss-revised-'+srno, inputEl.value, async (val) => {
-    t.revised = val ? toDate(val) : null;
-    return updateTask(srno, { revised: val });
-  });
-}
-
-// ── QUICK ADD ─────────────────────────────────────────────────────────────
+// ── ADD TASK ──────────────────────────────────────────────────────────────
 // Adds the new task straight into the local list using the values we just
 // sent (and the Sr No the backend confirms), rather than re-fetching
 // everything from the sheet — faster, and immune to any read-after-write
@@ -1411,24 +1444,6 @@ function applyNewTaskLocally(fields, srNo) {
   render();
 }
 
-async function quickAddTask() {
-  const input = document.getElementById('qa-task-input');
-  const btn = document.getElementById('qa-add-btn');
-  const val = input.value.trim();
-  if (!val) return;
-  input.disabled = true; btn.disabled = true; btn.textContent = 'Saving…';
-  const fields = { task: val, status: 'Pending' };
-  const res = await addTask(fields);
-  input.disabled = false; btn.disabled = false; btn.textContent = 'Add';
-  if (res.success) {
-    input.value = '';
-    applyNewTaskLocally(fields, res.srNo);
-    showToast('Task added ✓', false);
-  } else {
-    showToast('Could not add task: ' + (res.error || 'unknown error'), true);
-  }
-}
-
 function openAddModal() {
   const cats = [...new Set(ALL.map(t=>t.cat).filter(Boolean))].sort();
   const owners = [...new Set(ALL.map(t=>t.owner).filter(Boolean))].sort();
@@ -1442,10 +1457,7 @@ function openAddModal() {
       <input type="text" id="am-owner" list="am-owner-list" placeholder="Pick or type new">
       <datalist id="am-owner-list">${owners.map(o=>`<option value="${esc(o)}">`).join('')}</datalist>
     </div></div>
-    <div class="detail-row"><div class="detail-lbl">Due Date</div><div class="detail-val"><input type="date" id="am-due"></div></div>
-    <div class="detail-row col-priority"><div class="detail-lbl">Priority</div><div class="detail-val">
-      <select id="am-priority"><option value="">—</option><option value="High">High</option><option value="Medium">Medium</option><option value="Low">Low</option></select>
-    </div></div>
+    <div class="detail-row col-remarks"><div class="detail-lbl">Remarks</div><div class="detail-val"><textarea id="am-remarks" placeholder="Optional"></textarea></div></div>
     <div class="detail-row" style="border-bottom:none;"><div class="detail-lbl"></div><div class="detail-val">
       <button class="modal-hdr-btn" id="am-submit-btn" style="background:var(--teal);color:var(--white);border-color:var(--teal);" onclick="submitAddModal()">Add task</button>
       <div class="save-err" id="am-error" style="display:none;"></div>
@@ -1463,8 +1475,7 @@ async function submitAddModal() {
     task,
     cat: document.getElementById('am-cat').value.trim(),
     owner: document.getElementById('am-owner').value.trim(),
-    due: document.getElementById('am-due').value,
-    priority: document.getElementById('am-priority').value,
+    remarks: document.getElementById('am-remarks').value.trim(),
     status: 'Pending',
   };
   const btn = document.getElementById('am-submit-btn');
@@ -1648,6 +1659,17 @@ function showError(msg) {
   document.getElementById(id).addEventListener('change', () => { QUICK=null; render(); })
 );
 document.getElementById('setup-input').addEventListener('keydown', e => { if (e.key==='Enter') submitSetup(); });
+
+// Delegated listener for every inline-editable field (status, dates,
+// remarks) — set up once here rather than re-attached per row on every
+// render, and reads which row/field via data-* attributes rather than
+// values embedded in the HTML itself.
+document.getElementById('tbl-body').addEventListener('change', e => {
+  if (e.target.classList && e.target.classList.contains('inline-edit-ctrl')) handleInlineFieldChange(e.target);
+});
+document.getElementById('card-body').addEventListener('change', e => {
+  if (e.target.classList && e.target.classList.contains('inline-edit-ctrl')) handleInlineFieldChange(e.target);
+});
 
 loadData();
 </script>
