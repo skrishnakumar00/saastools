@@ -80,6 +80,8 @@ header {
   transition: border-color 0.15s; min-width: 150px;
 }
 .ctrl-select:focus { border-color: var(--teal); }
+.mytasks-edit { cursor: pointer; font-size: 11px; color: var(--muted); padding: 2px; }
+.mytasks-edit:hover { color: var(--teal); }
 
 /* ── MAIN ── */
 main { max-width: 1160px; margin: 0 auto; padding: 24px 20px 60px; }
@@ -205,6 +207,8 @@ main { max-width: 1160px; margin: 0 auto; padding: 24px 20px 60px; }
   padding: 8px 16px; font-size: 12px; font-weight: 600; cursor: pointer; transition: background 0.15s;
 }
 .quick-add-btn:hover { background: var(--teal-dark); }
+#mytasks-btn.active { background: var(--amber); }
+#mytasks-btn.active:hover { background: #b87a08; }
 
 .tbl-toolbar {
   display: flex; align-items: center; gap: 10px;
@@ -304,6 +308,7 @@ select.status-pill:focus { outline: 2px solid var(--teal); outline-offset: 1px; 
 .tag-nodate  { display: inline-block; background: var(--amber); color: var(--white); font-size: 9px; font-weight: 700; padding: 1px 5px; border-radius: 6px; margin-left: 4px; vertical-align: middle; }
 .tag-noowner { display: inline-block; background: var(--amber); color: var(--white); font-size: 9px; font-weight: 700; padding: 1px 5px; border-radius: 6px; margin-left: 4px; vertical-align: middle; }
 
+.td-srno  { color: var(--muted); font-size: 10.5px; white-space: nowrap; }
 .td-cat   { color: var(--teal-dark); font-weight: 600; font-size: 11px; white-space: nowrap; }
 .td-task  { font-weight: 500; min-width: 160px; }
 .task-link { cursor: pointer; }
@@ -330,6 +335,7 @@ select.status-pill:focus { outline: 2px solid var(--teal); outline-offset: 1px; 
 .tc-owner { color: var(--teal-dark); font-weight: 600; }
 .tc-date  { color: var(--muted); }
 .tc-cat   { color: var(--teal-dark); font-size: 10px; font-weight: 600; }
+.tc-srno  { color: var(--muted); font-size: 10px; font-weight: 600; }
 
 /* ── MODAL (mobile task detail) ── */
 .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 200; align-items: center; justify-content: center; padding: 16px; }
@@ -358,14 +364,16 @@ select.status-pill:focus { outline: 2px solid var(--teal); outline-offset: 1px; 
 }
 .modal-hdr-btn:hover { background: rgba(255,255,255,0.28); }
 .modal-hdr-btn.primary { background: var(--white); color: var(--teal-dark); border-color: var(--white); }
+.modal-hdr-btn.danger { background: var(--coral); color: var(--white); border-color: var(--coral); }
+.modal-hdr-btn.danger:hover { background: #c94a2f; }
 .modal-hdr-btns { display: flex; align-items: center; }
 
 /* ── SETUP SCREEN ── */
-#setup-overlay {
+#setup-overlay, #login-overlay, #configwarn-overlay, #mytasks-overlay {
   position: fixed; inset: 0; background: var(--bg); z-index: 400;
   display: none; align-items: center; justify-content: center; padding: 20px;
 }
-#setup-overlay.show { display: flex; }
+#setup-overlay.show, #login-overlay.show, #configwarn-overlay.show, #mytasks-overlay.show { display: flex; }
 .setup-card {
   background: var(--white); border-radius: 14px; border: 1.5px solid var(--border);
   max-width: 480px; width: 100%; padding: 32px 28px; box-shadow: 0 10px 40px rgba(0,0,0,0.08);
@@ -404,7 +412,8 @@ body.hide-priority .col-priority,
 body.hide-cat .col-cat,
 body.hide-remarks .col-remarks,
 body.hide-revised .col-revised,
-body.hide-owner .col-owner { display: none !important; }
+body.hide-owner .col-owner,
+body.hide-project .col-project { display: none !important; }
 
 @media (max-width: 700px) {
   header { padding: 8px 14px; }
@@ -452,6 +461,44 @@ body.hide-owner .col-owner { display: none !important; }
   </div>
 </div>
 
+<!-- LOGIN SCREEN — shown only if the connected sheet has an Access tab set up -->
+<div id="login-overlay">
+  <div class="setup-card">
+    <h1>🔑 Log in</h1>
+    <p>This tracker is set up for multiple people/projects — log in to see your project(s).</p>
+    <div class="setup-error" id="login-error"></div>
+    <label for="login-username">Username</label>
+    <input type="text" id="login-username" placeholder="Your username">
+    <label for="login-pin">PIN</label>
+    <input type="password" id="login-pin" inputmode="numeric" placeholder="Your PIN">
+    <button id="login-submit-btn" onclick="submitLogin()">Log in →</button>
+    <div class="setup-help">
+      First time logging in? Just choose any PIN — you'll use that same one every time after.
+      Nobody else, including the sheet owner, sets or sees your PIN.
+    </div>
+  </div>
+</div>
+
+<!-- CONFIG WARNING — Access tab exists but Tasks has no Project column yet -->
+<div id="configwarn-overlay">
+  <div class="setup-card">
+    <h1>⚠️ Setup incomplete</h1>
+    <p id="configwarn-text" style="color:var(--coral);"></p>
+    <div class="setup-help">This dashboard can't safely guess which project existing tasks belong to — add the column, then refresh this page.</div>
+  </div>
+</div>
+
+<!-- MY TASKS — one-time name picker, saved on this browser -->
+<div id="mytasks-overlay">
+  <div class="setup-card">
+    <h1>⭐ Which name is yours?</h1>
+    <p>Saved on this browser, so "My Tasks" jumps straight to your tasks going forward.</p>
+    <label for="mytasks-select">Your name</label>
+    <select id="mytasks-select"></select>
+    <button onclick="saveMyTasksName()">Save →</button>
+  </div>
+</div>
+
 <!-- HEADER -->
 <header>
   <div class="hdr-left">
@@ -468,6 +515,7 @@ body.hide-owner .col-owner { display: none !important; }
     <a class="hdr-link" id="hdr-sheet-link" href="#" target="_blank" style="display:none;">
       ✎ <span>Edit in Sheet</span> ↗
     </a>
+    <button class="hdr-link" id="switch-user-btn" onclick="switchUser()" style="display:none;">👤 <span id="switch-user-label">Switch user</span></button>
     <button class="hdr-link" onclick="loadData()">↻ <span>Refresh</span></button>
     <span class="hdr-refresh">Refreshed: <span id="last-refresh">—</span></span>
     <button class="hdr-link" onclick="openChangeSheet()">⚙ <span>Change sheet</span></button>
@@ -476,8 +524,14 @@ body.hide-owner .col-owner { display: none !important; }
 
 <!-- CONTROLS -->
 <div class="controls">
+  <span class="ctrl-label" id="f-project-label" style="display:none;">Project</span>
+  <select class="ctrl-select" id="f-project" style="display:none;"><option value="All">All</option></select>
   <span class="ctrl-label col-owner">Viewing</span>
   <select class="ctrl-select col-owner" id="f-owner"><option value="All">All</option></select>
+  <span class="col-owner" style="display:flex;align-items:center;gap:3px;">
+    <button class="quick-add-btn" id="mytasks-btn" style="padding:6px 12px;font-size:11.5px;" onclick="handleMyTasksClick()">⭐ <span id="mytasks-label">My Tasks</span></button>
+    <span class="mytasks-edit" id="mytasks-edit" onclick="openMyTasksPicker()" style="display:none;" title="Change my name">✎</span>
+  </span>
   <span class="ctrl-label col-cat">Category</span>
   <select class="ctrl-select col-cat" id="f-cat"><option value="All">All</option></select>
   <span class="ctrl-label">Status</span>
@@ -582,6 +636,9 @@ body.hide-owner .col-owner { display: none !important; }
   <div class="parked-link-row" id="parked-link-row" style="display:none;">
     <span class="parked-link" onclick="quickFilter({quick:'parked'})">📌 <span id="parked-count">0</span> parked ideas — view →</span>
   </div>
+  <div class="parked-link-row" id="done-link-row" style="display:none;">
+    <span class="parked-link" onclick="quickFilter({quick:'done'})">✅ <span id="done-count">0</span> done tasks — view →</span>
+  </div>
 
   <!-- TASK LIST -->
   <div class="sec-label" style="margin-top:24px;">Task list</div>
@@ -606,7 +663,7 @@ body.hide-owner .col-owner { display: none !important; }
     <div class="tbl-desktop" style="overflow-x:auto;">
       <table class="task-table">
         <thead><tr id="tbl-head-row">
-          <th class="col-cat">Category</th><th>Task</th><th class="col-owner">Owner</th>
+          <th class="td-srno">Sr No</th><th class="col-project">Project</th><th class="col-cat">Category</th><th>Task</th><th class="col-owner">Owner</th>
           <th>Due Date</th><th class="col-revised">Revised Date</th><th class="col-priority">Priority</th><th>Status</th><th class="col-remarks">Remarks</th>
         </tr></thead>
         <tbody id="tbl-body"></tbody>
@@ -624,6 +681,7 @@ body.hide-owner .col-owner { display: none !important; }
       <h2 id="detail-modal-title">Task detail</h2>
       <div class="modal-hdr-btns" id="detail-modal-btns">
         <button class="modal-hdr-btn" id="detail-edit-btn" onclick="startEditMode()" style="display:none;">✎ Edit</button>
+        <button class="modal-hdr-btn danger" id="detail-delete-btn" onclick="confirmDeleteTask()" style="display:none;">🗑 Delete</button>
         <button class="modal-hdr-btn" id="detail-cancel-btn" onclick="cancelEditMode()" style="display:none;">Cancel</button>
         <button class="modal-hdr-btn primary" id="detail-save-btn" onclick="saveEditMode()" style="display:none;">Save</button>
       </div>
@@ -658,6 +716,7 @@ const FIELD_ALIASES = {
   revised:  ['revised due date','revised date'],
   status:   ['status'],
   remarks:  ['remarks','notes'],
+  project:  ['project'],
 };
 const NOTES_ALIASES  = { heading: ['heading','point','topic','title'], detail: ['detail','details','description','notes'] };
 const TARGETS_ALIASES = {
@@ -694,6 +753,7 @@ function applyColumnVisibility() {
   body.classList.toggle('hide-remarks',  !HAS.remarks);
   body.classList.toggle('hide-revised',  !HAS.revised);
   body.classList.toggle('hide-owner',    !HAS.owner);
+  body.classList.toggle('hide-project',  !HAS.project);
 }
 
 // ── STATE ────────────────────────────────────────────────────────────────────
@@ -704,6 +764,8 @@ let MISSING_CATS = [];
 let SCRIPT_URL = null;
 let CONFIG = {};
 let SHEET_URL = '';
+let AUTH = { isAllAccess: true, userProjects: ['All'], username: null };
+let LAST_LOAD_TS = 0;
 
 // ── CONNECTION: URL param → localStorage → setup screen ─────────────────────
 function resolveScriptUrl() {
@@ -742,20 +804,123 @@ function openChangeSheet() {
   showSetup(null);
 }
 
+// ── LOGIN (only relevant if the connected sheet has an Access tab) ──────────
+// Credentials are cached per-script-URL, so switching sheets via "Change
+// sheet" never carries a login over to a different backend by accident.
+function credsKey() { return 'trackerAuth:' + SCRIPT_URL; }
+function getCachedCreds() {
+  try { return JSON.parse(localStorage.getItem(credsKey())) || {}; } catch (e) { return {}; }
+}
+function setCachedCreds(username, pin) { localStorage.setItem(credsKey(), JSON.stringify({ username, pin })); }
+function clearCachedCreds() { localStorage.removeItem(credsKey()); }
+
+function showLogin(errorMsg) {
+  document.getElementById('loading').style.display = 'none';
+  document.getElementById('login-overlay').classList.add('show');
+  const err = document.getElementById('login-error');
+  if (errorMsg) { err.textContent = errorMsg; err.style.display = 'block'; }
+  else { err.style.display = 'none'; }
+}
+function hideLogin() { document.getElementById('login-overlay').classList.remove('show'); }
+
+function showConfigWarning(msg) {
+  document.getElementById('loading').style.display = 'none';
+  document.getElementById('configwarn-text').textContent = msg;
+  document.getElementById('configwarn-overlay').classList.add('show');
+}
+function hideConfigWarning() { document.getElementById('configwarn-overlay').classList.remove('show'); }
+
+async function submitLogin() {
+  const username = document.getElementById('login-username').value.trim();
+  const pin = document.getElementById('login-pin').value.trim();
+  if (!username || !pin) { showLogin('Enter both username and PIN.'); return; }
+
+  // The full-page #loading spinner sits BEHIND the login screen (lower
+  // z-index), so it was spinning invisibly during login — showing
+  // progress on the button itself instead, which is also just clearer UX.
+  const btn = document.getElementById('login-submit-btn');
+  btn.disabled = true; btn.textContent = 'Logging in…';
+  const data = await fetchTrackerData(username, pin);
+  btn.disabled = false; btn.textContent = 'Log in →';
+
+  if (!data) { showLogin('Could not reach the backend. Check your connection and try again.'); return; }
+  if (data.authRequired) { showLogin(data.authError || 'Login failed.'); return; }
+
+  setCachedCreds(username, pin);
+  hideLogin();
+  await applyLoadedData(data);
+}
+
+function switchUser() {
+  clearCachedCreds();
+  document.getElementById('login-username').value = '';
+  document.getElementById('login-pin').value = '';
+  showLogin(null);
+}
+
+// ── MY TASKS (personal shortcut, saved per-browser per-sheet) ───────────────
+function myTasksKey() { return 'trackerMyName:' + SCRIPT_URL; }
+function getMyName() { return localStorage.getItem(myTasksKey()) || ''; }
+function setMyName(name) { localStorage.setItem(myTasksKey(), name); }
+
+// Toggles between "my tasks only" and "show all" — reversible with the
+// same tap. The saved name itself is never cleared by toggling off, so
+// the NEXT full load (refresh/login) snaps back to filtering on it again;
+// toggling off is a temporary "show everything" for the current view only.
+function handleMyTasksClick() {
+  const name = getMyName();
+  if (!name) { openMyTasksPicker(); return; }
+  const isActive = document.getElementById('f-owner').value.toLowerCase() === name.toLowerCase();
+  quickFilter({ owner: isActive ? 'All' : name });
+}
+
+function openMyTasksPicker() {
+  const names = uniqueOwners(ALL);
+  const sel = document.getElementById('mytasks-select');
+  sel.innerHTML = names.map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join('');
+  const current = getMyName();
+  const match = names.find(n => n.toLowerCase() === current.toLowerCase());
+  if (match) sel.value = match;
+  document.getElementById('mytasks-overlay').classList.add('show');
+}
+function closeMyTasksPicker() { document.getElementById('mytasks-overlay').classList.remove('show'); }
+
+function saveMyTasksName() {
+  const name = document.getElementById('mytasks-select').value;
+  if (!name) return;
+  setMyName(name);
+  closeMyTasksPicker();
+  updateMyTasksUI();
+  quickFilter({ owner: name });
+}
+
+// Called after every data load AND every render — keeps the button's
+// label and active/highlighted state accurate regardless of how the
+// Owner filter changed (the button itself, the dropdown, Clear, etc.)
+function updateMyTasksUI() {
+  const name = getMyName();
+  document.getElementById('mytasks-label').textContent = name ? `My Tasks (${name})` : 'My Tasks';
+  document.getElementById('mytasks-edit').style.display = name ? 'inline' : 'none';
+  const isActive = name && document.getElementById('f-owner').value.toLowerCase() === name.toLowerCase();
+  document.getElementById('mytasks-btn').classList.toggle('active', !!isActive);
+}
+
 // ── FETCH & INIT ─────────────────────────────────────────────────────────────
 // Sends a write request to the Apps Script backend. Uses text/plain as the
 // Content-Type — this avoids a CORS "preflight" request that Apps Script
 // doesn't handle, while the script still parses the body as JSON on its side.
+// Credentials (if this sheet uses login) are attached automatically.
 async function postToScript(payload) {
   if (!SCRIPT_URL) return { success: false, error: 'Not connected to a sheet.' };
+  const creds = getCachedCreds();
+  const fullPayload = Object.assign({}, payload, creds.username ? { username: creds.username, pin: creds.pin } : {});
   try {
     const res = await fetch(SCRIPT_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify(payload),
+      body: JSON.stringify(fullPayload),
     });
-    const json = await res.json();
-    return json;
+    return await res.json();
   } catch (err) {
     return { success: false, error: err.message };
   }
@@ -782,6 +947,21 @@ async function addTask(fields) {
   return postToScript({ action: 'add', sheet: 'Tasks', row });
 }
 
+async function deleteTaskRow(srno) {
+  return postToScript({ action: 'delete', sheet: 'Tasks', matchField: TASK_HEADER_MAP.srno, matchValue: srno });
+}
+
+async function fetchTrackerData(username, pin) {
+  try {
+    let url = SCRIPT_URL + (SCRIPT_URL.includes('?') ? '&' : '?') + 't=' + Date.now();
+    if (username) url += '&username=' + encodeURIComponent(username) + '&pin=' + encodeURIComponent(pin || '');
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    return await res.json();
+  } catch (err) {
+    return null;
+  }
+}
 
 async function loadData() {
   SCRIPT_URL = resolveScriptUrl();
@@ -791,25 +971,44 @@ async function loadData() {
   document.getElementById('loading').style.display = 'flex';
   document.getElementById('error-banner').style.display = 'none';
 
-  let data;
-  try {
-    const res = await fetch(SCRIPT_URL + (SCRIPT_URL.includes('?') ? '&' : '?') + 't=' + Date.now());
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-    data = await res.json();
-  } catch (err) {
-    document.getElementById('loading').style.display = 'none';
-    showError(err.message);
-    return;
-  }
+  const creds = getCachedCreds();
+  const data = await fetchTrackerData(creds.username, creds.pin);
+  document.getElementById('loading').style.display = 'none';
 
+  if (!data) { showError('Could not reach the Apps Script backend.'); return; }
+  if (data.configWarning) { showConfigWarning(data.configWarning); return; }
+  if (data.authRequired) { showLogin(data.authError || null); return; }
+
+  hideLogin();
+  hideConfigWarning();
+  await applyLoadedData(data);
+}
+
+async function applyLoadedData(data) {
   SHEET_URL = data.sheetUrl || '';
   CONFIG = data.config || {};
+  AUTH = {
+    isAllAccess: !!data.isAllAccess,
+    userProjects: data.userProjects || ['All'],
+    username: data.username || null,
+  };
   applyConfig();
   renderCountdown();
 
   ALL = buildTasks(data.tasks || []);
   buildFilters();
+
+  // "My Tasks" snaps back to filtering on the saved name on every fresh
+  // load (refresh, login, sheet switch) — turning it off via the button
+  // is only a temporary "show all" for the current view, not persisted.
+  const myName = getMyName();
+  if (myName) {
+    const match = uniqueOwners(ALL).find(o => o.toLowerCase() === myName.toLowerCase());
+    if (match) document.getElementById('f-owner').value = match;
+  }
+
   render();
+  LAST_LOAD_TS = Date.now();
   document.getElementById('last-refresh').textContent =
     new Date().toLocaleTimeString('en-IN', {hour:'2-digit', minute:'2-digit'});
 
@@ -819,7 +1018,13 @@ async function loadData() {
   renderProgress(targetRows);
   if (targetRows.length > 0) checkCategoryMismatch(targetRows);
 
-  document.getElementById('loading').style.display = 'none';
+  const switchBtn = document.getElementById('switch-user-btn');
+  if (AUTH.username) {
+    switchBtn.style.display = 'inline-flex';
+    document.getElementById('switch-user-label').textContent = AUTH.username;
+  } else {
+    switchBtn.style.display = 'none';
+  }
 }
 
 // ── CONFIG (Title / Subtitle / Logo / Deadline) ──────────────────────────────
@@ -869,6 +1074,7 @@ function buildTasks(rawRows) {
     priority: hasAlias(FIELD_ALIASES.priority), owner: hasAlias(FIELD_ALIASES.owner),
     due: hasAlias(FIELD_ALIASES.due), revised: hasAlias(FIELD_ALIASES.revised),
     status: hasAlias(FIELD_ALIASES.status), remarks: hasAlias(FIELD_ALIASES.remarks),
+    project: hasAlias(FIELD_ALIASES.project),
   };
   applyColumnVisibility();
 
@@ -896,6 +1102,7 @@ function buildTasks(rawRows) {
       revised: toDate(pickField(row, FIELD_ALIASES.revised)),
       status: pickField(row, FIELD_ALIASES.status) || 'Pending',
       remarks: pickField(row, FIELD_ALIASES.remarks),
+      project: pickField(row, FIELD_ALIASES.project),
       extraVals: EXTRA.map(ex => String(row[ex.key] ?? '').trim()),
     });
   });
@@ -971,41 +1178,113 @@ function isNoOwner(t) {
 }
 function isPendingOrOngoing(t) { return t.status === 'Pending' || t.status === 'Ongoing'; }
 
+// Owner cells can hold more than one name ("A, B") for co-owned tasks —
+// this splits that into individual names so filtering/breakdown/"My Tasks"
+// all correctly match a task to EVERY owner listed on it, not just an
+// exact whole-string match.
+function ownerList(t) {
+  return (t.owner || '').split(',').map(s => s.trim()).filter(Boolean);
+}
+// Case-insensitive: "Priya" and "priya" are treated as the same person.
+function ownerHas(t, name) {
+  const target = name.trim().toLowerCase();
+  return ownerList(t).some(o => o.toLowerCase() === target);
+}
+// Unique owner names across a set of tasks, de-duplicated case-insensitively
+// (so "Priya" and "priya" collapse into one entry) while keeping whichever
+// casing appeared first, for a clean dropdown/suggestion list.
+function uniqueOwners(tasks) {
+  const seen = new Map();
+  tasks.flatMap(ownerList).forEach(name => {
+    const key = name.toLowerCase();
+    if (!seen.has(key)) seen.set(key, name);
+  });
+  return [...seen.values()].sort((a,b) => a.localeCompare(b));
+}
+
 // ── FILTERS ──────────────────────────────────────────────────────────────────
+// Rebuilds the Owner / Category / Project dropdown option lists from the
+// current ALL tasks (used after every load, and after add/edit/delete
+// change what owners/categories exist). Rebuilding a <select>'s innerHTML
+// always resets its selection, so we snapshot each dropdown's current
+// value first and restore it afterward (falling back to "All" only if
+// that value no longer exists among the new options) — otherwise an
+// active "My Tasks"/category/project filter would silently revert to
+// "All" every time a task was added, edited, or deleted.
 function buildFilters() {
-  const owners = [...new Set(ALL.map(t=>t.owner).filter(Boolean))].sort();
-  const os = document.getElementById('f-owner');
-  os.innerHTML = '<option value="All">All</option>';
-  owners.forEach(o => { const opt=document.createElement('option'); opt.value=o; opt.textContent=o; os.appendChild(opt); });
+  const ownerSel = document.getElementById('f-owner');
+  const catSel = document.getElementById('f-cat');
+  const projSel = document.getElementById('f-project');
+  const prevOwner = ownerSel.value;
+  const prevCat = catSel.value;
+  const prevProject = projSel ? projSel.value : 'All';
+
+  const owners = uniqueOwners(ALL);
+  ownerSel.innerHTML = '<option value="All">All</option>';
+  owners.forEach(o => { const opt=document.createElement('option'); opt.value=o; opt.textContent=o; ownerSel.appendChild(opt); });
+  // Owner names are matched case-insensitively (same rule used everywhere
+  // else for owners), so a save under "priya" still restores "Priya".
+  const matchedOwner = owners.find(o => o.toLowerCase() === prevOwner.toLowerCase());
+  ownerSel.value = matchedOwner || (prevOwner === 'All' ? 'All' : 'All');
 
   const cats = [...new Set(ALL.map(t=>t.cat).filter(Boolean))].sort();
-  const cs = document.getElementById('f-cat');
-  cs.innerHTML = '<option value="All">All</option>';
-  cats.forEach(c => { const opt=document.createElement('option'); opt.value=c; opt.textContent=c; cs.appendChild(opt); });
+  catSel.innerHTML = '<option value="All">All</option>';
+  cats.forEach(c => { const opt=document.createElement('option'); opt.value=c; opt.textContent=c; catSel.appendChild(opt); });
+  catSel.value = cats.includes(prevCat) ? prevCat : 'All';
+
+  // Project dropdown: only shown when the sheet has a Project column AND
+  // there's actually more than one project to choose between — a
+  // single-project user never sees a dropdown with nothing to switch to.
+  const projLabel = document.getElementById('f-project-label');
+  if (HAS.project) {
+    const projects = AUTH.isAllAccess
+      ? [...new Set(ALL.map(t=>t.project).filter(Boolean))].sort()
+      : AUTH.userProjects.slice().sort();
+    const showDropdown = projects.length > 1;
+    projLabel.style.display = showDropdown ? '' : 'none';
+    projSel.style.display = showDropdown ? '' : 'none';
+    projSel.innerHTML = '<option value="All">All</option>';
+    projects.forEach(p => { const opt=document.createElement('option'); opt.value=p; opt.textContent=p; projSel.appendChild(opt); });
+    projSel.value = projects.includes(prevProject) ? prevProject : 'All';
+  } else {
+    projLabel.style.display = 'none';
+    projSel.style.display = 'none';
+  }
 }
 
 function filtered() {
   const o = document.getElementById('f-owner').value;
   const c = document.getElementById('f-cat').value;
   const s = document.getElementById('f-status').value;
+  const p = HAS.project ? document.getElementById('f-project').value : 'All';
   let list = ALL.filter(t =>
-    (o==='All' || t.owner===o) && (c==='All' || t.cat===c) && (s==='All' || t.status===s)
+    (o==='All' || ownerHas(t, o)) && (c==='All' || t.cat===c) && (s==='All' || t.status===s) &&
+    (p==='All' || t.project===p)
   );
   if      (QUICK==='pendongoing') list = list.filter(isPendingOrOngoing);
   else if (QUICK==='overdue')     list = list.filter(isOverdue);
   else if (QUICK==='nodate')      list = list.filter(isNoDate);
   else if (QUICK==='noowner')     list = list.filter(isNoOwner);
   else if (QUICK==='parked')      list = list.filter(t=>t.status==='Parked');
+  else if (QUICK==='done')        list = list.filter(t=>t.status==='Done');
   else if (QUICK==='missingcat')  list = list.filter(t=>MISSING_CATS.includes(t.cat));
-  else if (QUICK==='ringcat')     list = list.filter(t=>t.status!=='Parked');
+  else if (QUICK==='ringcat')     list = list.filter(t=>t.status!=='Parked' && t.status!=='Done');
+
+  // Default view (no explicit status filter, no quick filter asking for
+  // them) always hides Done and Parked — Task List shows Pending/Ongoing/
+  // Blocked only, matching how Parked already worked, now extended to Done.
+  if (s==='All' && QUICK!=='parked' && QUICK!=='done') {
+    list = list.filter(t => t.status!=='Done' && t.status!=='Parked');
+  }
   return list;
 }
-function kpiTasks() { return filtered().filter(t => t.status !== 'Parked'); }
+function kpiTasks() { return filtered().filter(t => t.status !== 'Parked' && t.status !== 'Done'); }
 
 // ── QUICK FILTER ─────────────────────────────────────────────────────────────
 function quickFilter(opts) {
-  if (opts.owner  !== undefined) document.getElementById('f-owner').value  = opts.owner;
-  if (opts.cat    !== undefined) document.getElementById('f-cat').value    = opts.cat;
+  if (opts.owner   !== undefined) document.getElementById('f-owner').value   = opts.owner;
+  if (opts.cat     !== undefined) document.getElementById('f-cat').value     = opts.cat;
+  if (opts.project !== undefined && HAS.project) document.getElementById('f-project').value = opts.project;
   document.getElementById('f-status').value = opts.status || 'All';
   QUICK = opts.quick || null;
   render();
@@ -1016,24 +1295,27 @@ function clearQuickFilter() {
   document.getElementById('f-owner').value = 'All';
   document.getElementById('f-cat').value = 'All';
   document.getElementById('f-status').value = 'All';
+  if (HAS.project) document.getElementById('f-project').value = 'All';
   render();
 }
 
 const QUICK_LABELS = {
   pendongoing: 'Pending / Ongoing', overdue: 'Overdue', nodate: 'No due date',
-  noowner: 'No owner', parked: 'Parked ideas', missingcat: 'No target set',
+  noowner: 'No owner', parked: 'Parked ideas', done: 'Done tasks', missingcat: 'No target set',
 };
 function updateActiveFilterBar() {
   const bar = document.getElementById('active-filter-bar');
   const o = document.getElementById('f-owner').value;
   const c = document.getElementById('f-cat').value;
   const s = document.getElementById('f-status').value;
+  const p = HAS.project ? document.getElementById('f-project').value : 'All';
   const parts = [];
+  if (p !== 'All') parts.push(p);
   if (o !== 'All') parts.push(o);
   if (c !== 'All') parts.push(c);
   if (s !== 'All') parts.push(s);
   if (QUICK && QUICK !== 'ringcat') parts.push(QUICK_LABELS[QUICK] || QUICK);
-  if (QUICK === 'ringcat') parts.push('excl. parked');
+  if (QUICK === 'ringcat') parts.push('excl. done/parked');
   if (parts.length === 0) { bar.classList.remove('show'); return; }
   document.getElementById('af-chip-text').textContent = parts.join(' · ');
   bar.classList.add('show');
@@ -1052,8 +1334,13 @@ function render() {
   document.getElementById('parked-count').textContent = parkedCount;
   document.getElementById('parked-link-row').style.display = parkedCount>0 ? 'flex' : 'none';
 
+  const doneCount = ALL.filter(t=>t.status==='Done').length;
+  document.getElementById('done-count').textContent = doneCount;
+  document.getElementById('done-link-row').style.display = doneCount>0 ? 'flex' : 'none';
+
   document.getElementById('tbl-title').textContent = owner==='All' ? 'All tasks' : `Tasks — ${owner}`;
   document.getElementById('add-task-btn').style.display = EDITABLE ? 'inline-block' : 'none';
+  updateMyTasksUI();
 }
 
 function renderKPIs(tasks) {
@@ -1138,10 +1425,10 @@ function renderCountdown() {
 // ── BREAKDOWN ────────────────────────────────────────────────────────────────
 function renderBreakdown(tasks, selectedOwner) {
   const owners = selectedOwner==='All'
-    ? [...new Set(tasks.map(t=>t.owner).filter(Boolean))].sort()
+    ? uniqueOwners(tasks)
     : [selectedOwner];
   document.getElementById('bkd-person').innerHTML = owners.map(o => {
-    const ot = tasks.filter(t=>t.owner===o);
+    const ot = tasks.filter(t=>ownerHas(t, o));
     const pend=ot.filter(isPendingOrOngoing).length;
     const bloc=ot.filter(t=>t.status==='Blocked').length;
     const ovrd=ot.filter(isOverdue).length;
@@ -1198,7 +1485,7 @@ function renderTaskList() {
 
   const tb = document.getElementById('tbl-body');
   if (tasks.length===0) {
-    tb.innerHTML = `<tr><td colspan="${8+EXTRA.length}"><div class="empty-state">No tasks match the current filters.</div></td></tr>`;
+    tb.innerHTML = `<tr><td colspan="${10+EXTRA.length}"><div class="empty-state">No tasks match the current filters.</div></td></tr>`;
   } else {
     tb.innerHTML = tasks.map((t,i) => {
       const over = isOverdue(t);
@@ -1209,6 +1496,8 @@ function renderTaskList() {
       const days = (over&&ed) ? Math.floor((TODAY-ed)/86400000) : 0;
       const extraCells = t.extraVals.map(v => `<td class="col-extra">${escNl(v)||'—'}</td>`).join('');
       return `<tr class="${over?'row-overdue':''} ${parked?'row-parked':''}">
+        <td class="td-srno">${esc(t.srno)||'—'}</td>
+        <td class="td-cat col-project">${esc(t.project)||'—'}</td>
         <td class="td-cat col-cat">${esc(t.cat)||'—'}</td>
         <td class="td-task">
           <span class="task-link" onclick="openDetailModal(${i})">${esc(t.task)}</span>
@@ -1239,10 +1528,11 @@ function renderTaskList() {
       const dateStr = t.revised&&!isNaN(t.revised) ? `Rev: ${fmt(t.revised)}` : (t.due&&!isNaN(t.due) ? fmt(t.due) : 'No date');
       return `<div class="task-card ${over?'tc-overdue':''} ${parked?'tc-parked':''}" onclick="openDetailModal(${i})">
         <div class="tc-top">
-          <div class="tc-task">${esc(t.task)}${over?`<span class="tag-overdue">${days}d</span>`:''}</div>
+          <div class="tc-task">${t.srno?`<span class="tc-srno">#${esc(t.srno)}</span> `:''}${esc(t.task)}${over?`<span class="tag-overdue">${days}d</span>`:''}</div>
           <span onclick="event.stopPropagation()">${statusControl(t)}</span>
         </div>
         <div class="tc-meta">
+          ${t.project ? `<span class="tc-cat col-project">${esc(t.project)}</span>` : ''}
           <span class="tc-cat col-cat">${esc(t.cat)||'—'}</span>
           <span class="tc-owner col-owner">${esc(t.owner)||'No owner'}</span>
           <span class="tc-date">${dateStr}</span>
@@ -1432,6 +1722,10 @@ function refreshAggregatesOnly() {
   const parkedCount = ALL.filter(t=>t.status==='Parked').length;
   document.getElementById('parked-count').textContent = parkedCount;
   document.getElementById('parked-link-row').style.display = parkedCount>0 ? 'flex' : 'none';
+
+  const doneCount = ALL.filter(t=>t.status==='Done').length;
+  document.getElementById('done-count').textContent = doneCount;
+  document.getElementById('done-link-row').style.display = doneCount>0 ? 'flex' : 'none';
 }
 
 // Single handler for every inline-editable field (status, revised date,
@@ -1484,6 +1778,7 @@ function applyNewTaskLocally(fields, srNo) {
     revised: null,
     status: fields.status || 'Pending',
     remarks: fields.remarks || '',
+    project: fields.project || '',
     extraVals: EXTRA.map(() => ''),
   };
   ALL.push(newTask);
@@ -1493,9 +1788,25 @@ function applyNewTaskLocally(fields, srNo) {
 
 function openAddModal() {
   const cats = [...new Set(ALL.map(t=>t.cat).filter(Boolean))].sort();
-  const owners = [...new Set(ALL.map(t=>t.owner).filter(Boolean))].sort();
+  const owners = uniqueOwners(ALL);
+
+  // Project field only appears when there's an actual choice to make —
+  // a user restricted to exactly one project gets it auto-filled silently.
+  let projectFieldHtml = '';
+  if (HAS.project) {
+    const projectChoices = AUTH.isAllAccess
+      ? [...new Set(ALL.map(t=>t.project).filter(Boolean))].sort()
+      : AUTH.userProjects.slice().sort();
+    if (projectChoices.length > 1) {
+      projectFieldHtml = `<div class="detail-row"><div class="detail-lbl">Project</div><div class="detail-val">
+        <select id="am-project">${projectChoices.map(p=>`<option value="${esc(p)}">${esc(p)}</option>`).join('')}</select>
+      </div></div>`;
+    }
+  }
+
   document.getElementById('add-modal-body').innerHTML = `
     <div class="detail-row"><div class="detail-lbl">Task</div><div class="detail-val"><input type="text" id="am-task" placeholder="What needs to be done?"></div></div>
+    ${projectFieldHtml}
     <div class="detail-row col-cat"><div class="detail-lbl">Category</div><div class="detail-val">
       <input type="text" id="am-cat" list="am-cat-list" placeholder="Pick or type new">
       <datalist id="am-cat-list">${cats.map(c=>`<option value="${esc(c)}">`).join('')}</datalist>
@@ -1525,6 +1836,13 @@ async function submitAddModal() {
     remarks: document.getElementById('am-remarks').value.trim(),
     status: 'Pending',
   };
+  if (HAS.project) {
+    const projSel = document.getElementById('am-project');
+    if (projSel) fields.project = projSel.value;
+    else if (!AUTH.isAllAccess && AUTH.userProjects.length === 1) fields.project = AUTH.userProjects[0];
+    // else: full-access user with 0/1 known project values — left blank,
+    // Apps Script will accept it as an unscoped/shared row.
+  }
   const btn = document.getElementById('am-submit-btn');
   btn.disabled = true; btn.textContent = 'Saving…';
   const res = await addTask(fields);
@@ -1570,6 +1888,7 @@ function openDetailModal(idx) {
 
   const canEdit = EDITABLE && t.srno;
   document.getElementById('detail-edit-btn').style.display = canEdit ? '' : 'none';
+  document.getElementById('detail-delete-btn').style.display = canEdit ? '' : 'none';
   document.getElementById('detail-cancel-btn').style.display = 'none';
   document.getElementById('detail-save-btn').style.display = 'none';
   document.getElementById('detail-modal').classList.add('open');
@@ -1598,7 +1917,7 @@ function startEditMode() {
   const t = window._detailTask;
   if (!t) return;
   const cats = [...new Set(ALL.map(x=>x.cat).filter(Boolean))].sort();
-  const owners = [...new Set(ALL.map(x=>x.owner).filter(Boolean))].sort();
+  const owners = uniqueOwners(ALL);
   document.getElementById('detail-modal-body').innerHTML = `
     <div class="detail-row"><div class="detail-lbl">Task</div><div class="detail-val"><textarea id="ed-task">${esc(t.task)}</textarea></div></div>
     <div class="detail-row col-cat"><div class="detail-lbl">Category</div><div class="detail-val">
@@ -1626,6 +1945,7 @@ function startEditMode() {
     <div class="save-err" id="ed-error" style="display:none;"></div>
   `;
   document.getElementById('detail-edit-btn').style.display = 'none';
+  document.getElementById('detail-delete-btn').style.display = 'none';
   document.getElementById('detail-cancel-btn').style.display = '';
   document.getElementById('detail-save-btn').style.display = '';
 }
@@ -1633,9 +1953,41 @@ function startEditMode() {
 function cancelEditMode() {
   const t = window._detailTask;
   renderDetailReadOnly(t);
-  document.getElementById('detail-edit-btn').style.display = (EDITABLE && t.srno) ? '' : 'none';
+  const canEdit = EDITABLE && t.srno;
+  document.getElementById('detail-edit-btn').style.display = canEdit ? '' : 'none';
+  document.getElementById('detail-delete-btn').style.display = canEdit ? '' : 'none';
   document.getElementById('detail-cancel-btn').style.display = 'none';
   document.getElementById('detail-save-btn').style.display = 'none';
+}
+
+// Real delete — the row is removed from the sheet entirely, not a status
+// change. Confirmed first since this can't be undone from the dashboard.
+async function confirmDeleteTask() {
+  const t = window._detailTask;
+  if (!t || !t.srno) return;
+  const ok = confirm(`Delete "${t.task}"? This can't be undone from the dashboard.`);
+  if (!ok) return;
+
+  const btn = document.getElementById('detail-delete-btn');
+  btn.disabled = true; btn.textContent = 'Deleting…';
+  const res = await deleteTaskRow(t.srno);
+  btn.disabled = false; btn.textContent = '🗑 Delete';
+
+  if (res.success) {
+    ALL = ALL.filter(x => String(x.srno) !== String(t.srno));
+    closeModal('detail-modal');
+    buildFilters();
+    render();
+    showToast('Task deleted', false);
+  } else {
+    const errEl = document.getElementById('ed-error');
+    if (errEl) {
+      errEl.textContent = 'Could not delete: ' + (res.error || 'unknown error');
+      errEl.style.display = 'block';
+    } else {
+      showToast('Could not delete: ' + (res.error || 'unknown error'), true);
+    }
+  }
 }
 
 async function saveEditMode() {
@@ -1673,12 +2025,16 @@ async function saveEditMode() {
 
   closeModal('detail-modal');
   showToast('Task updated ✓', false);
+  // Rebuild filter dropdowns too (a new owner/category typed here should
+  // become selectable), now safe to call since buildFilters preserves
+  // whatever the Owner/Category/Project filters were already set to.
+  buildFilters();
   render();
 }
 
 function closeModal(id) { document.getElementById(id).classList.remove('open'); }
 function closeModalOutside(e, id) { if (e.target===document.getElementById(id)) closeModal(id); }
-document.addEventListener('keydown', e => { if (e.key==='Escape') { closeModal('detail-modal'); closeModal('add-modal'); } });
+document.addEventListener('keydown', e => { if (e.key==='Escape') { closeModal('detail-modal'); closeModal('add-modal'); closeMyTasksPicker(); } });
 
 // ── HELPERS ──────────────────────────────────────────────────────────────────
 function esc(s) {
@@ -1702,10 +2058,12 @@ function showError(msg) {
 }
 
 // ── INIT ─────────────────────────────────────────────────────────────────────
-['f-owner','f-cat','f-status'].forEach(id =>
-  document.getElementById(id).addEventListener('change', () => { QUICK=null; render(); })
-);
+['f-owner','f-cat','f-status','f-project'].forEach(id => {
+  const el = document.getElementById(id);
+  if (el) el.addEventListener('change', () => { QUICK=null; render(); });
+});
 document.getElementById('setup-input').addEventListener('keydown', e => { if (e.key==='Enter') submitSetup(); });
+document.getElementById('login-pin').addEventListener('keydown', e => { if (e.key==='Enter') submitLogin(); });
 
 // Delegated listener for every inline-editable field (status, dates,
 // remarks) — set up once here rather than re-attached per row on every
