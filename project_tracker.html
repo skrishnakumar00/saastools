@@ -435,6 +435,42 @@ body.hide-project .col-project { display: none !important; }
   .task-cards  { display: block; }
 }
 </style>
+<style>
+/* ══ LEADS FEATURE (isolated — remove this whole <style> block + the
+   matching HTML section/modals + the matching JS block to fully remove
+   the feature) ══ */
+#leads-section { margin-top: 6px; }
+.leads-toolbar {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 12px 14px; background: var(--slate-light);
+  border-bottom: 1px solid var(--border);
+}
+.leads-toolbar h3 { font-size: 13px; font-weight: 700; color: var(--text); flex: 1; }
+.leads-kpi-row { display: grid; gap: 10px; grid-template-columns: repeat(3, 1fr); margin-bottom: 12px; }
+.lead-table { width: 100%; border-collapse: collapse; }
+.lead-table th {
+  font-size: 10px; font-weight: 700; color: var(--muted); text-transform: uppercase;
+  letter-spacing: 0.4px; padding: 9px 11px; text-align: left; background: var(--slate-light);
+  border-bottom: 2px solid var(--border); white-space: nowrap;
+}
+.lead-table td { padding: 9px 11px; font-size: 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+.lead-table tr:last-child td { border-bottom: none; }
+.lead-table tr:hover td { background: var(--slate-light); }
+.lead-link { cursor: pointer; font-weight: 500; }
+.lead-link:hover { text-decoration: underline; text-decoration-color: var(--teal); color: var(--teal-dark); }
+.lead-pill { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; white-space: nowrap; }
+.lp-active { background: var(--teal-light); color: var(--teal); }
+.lp-won    { background: #eaf5ee; color: #2e7d4f; }
+.lp-lost   { background: var(--coral-light); color: var(--coral); }
+.lead-interaction-item { padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 12.5px; }
+.lead-interaction-item:last-child { border-bottom: none; }
+.lead-interaction-date { font-weight: 700; color: var(--teal-dark); font-size: 11px; }
+.lead-interaction-notes { color: var(--text); margin-top: 2px; line-height: 1.5; }
+.lead-add-interaction { display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap; align-items: flex-start; }
+.lead-add-interaction input[type="date"] { border: 1.5px solid var(--border); border-radius: 6px; padding: 6px 9px; font-size: 12.5px; font-family: 'Inter', sans-serif; }
+.lead-add-interaction textarea { flex: 1; min-width: 160px; border: 1.5px solid var(--border); border-radius: 6px; padding: 6px 9px; font-size: 12.5px; font-family: 'Inter', sans-serif; min-height: 36px; resize: vertical; }
+.lead-empty { padding: 24px; text-align: center; color: var(--muted); font-size: 13px; }
+</style>
 </head>
 <body>
 
@@ -672,6 +708,34 @@ body.hide-project .col-project { display: none !important; }
 
     <div class="task-cards" id="card-body" style="padding:10px;"></div>
   </div>
+
+  <!-- ══ LEADS (isolated feature — delete this whole div, its two modals
+       below, the matching JS block, and the matching <style> block to
+       remove the feature entirely) ══ -->
+  <div id="leads-section" style="display:none;">
+    <div class="sec-label" style="margin-top:24px;">Leads</div>
+    <div class="leads-kpi-row">
+      <div class="kpi-card kpi-total"><div class="kpi-bar"></div><div class="kpi-lbl">Total Leads</div><div class="kpi-num" id="lk-total">—</div></div>
+      <div class="kpi-card kpi-pending"><div class="kpi-bar"></div><div class="kpi-lbl">Active</div><div class="kpi-num" id="lk-active">—</div></div>
+      <div class="kpi-card kpi-blocked"><div class="kpi-bar"></div><div class="kpi-lbl">Converted</div><div class="kpi-num" id="lk-won">—</div></div>
+    </div>
+    <div class="tbl-wrap">
+      <div class="leads-toolbar">
+        <h3>Leads</h3>
+        <select class="tbl-filter" id="f-lead-type" onchange="renderLeadsTable()"><option value="All">All types</option></select>
+        <select class="tbl-filter" id="f-lead-status" onchange="renderLeadsTable()"><option value="All">All statuses</option></select>
+        <button class="quick-add-btn" onclick="openAddLeadModal()">+ Add lead</button>
+      </div>
+      <div style="overflow-x:auto;">
+        <table class="lead-table">
+          <thead><tr>
+            <th>Sr No</th><th>Name</th><th>Type</th><th>Status</th><th>Contact</th><th>Notes</th>
+          </tr></thead>
+          <tbody id="lead-tbl-body"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
 </main>
 
 <!-- TASK DETAIL MODAL (tap a task on mobile, click a row on desktop) -->
@@ -699,6 +763,34 @@ body.hide-project .col-project { display: none !important; }
       <button class="modal-close" onclick="closeModal('add-modal')">×</button>
     </div>
     <div class="modal-body" id="add-modal-body" style="padding:16px 20px;"></div>
+  </div>
+</div>
+
+<!-- LEAD DETAIL MODAL (isolated — delete with the Leads JS block + section + CSS to remove the feature) -->
+<div class="modal-overlay" id="lead-detail-modal" onclick="closeModalOutside(event,'lead-detail-modal')">
+  <div class="modal detail-modal">
+    <div class="modal-hdr">
+      <h2 id="lead-detail-title">Lead detail</h2>
+      <div class="modal-hdr-btns" id="lead-detail-btns">
+        <button class="modal-hdr-btn" id="lead-edit-btn" onclick="startLeadEditMode()">✎ Edit</button>
+        <button class="modal-hdr-btn danger" id="lead-delete-btn" onclick="confirmDeleteLead()">🗑 Delete</button>
+        <button class="modal-hdr-btn" id="lead-cancel-btn" onclick="cancelLeadEditMode()" style="display:none;">Cancel</button>
+        <button class="modal-hdr-btn primary" id="lead-save-btn" onclick="saveLeadEditMode()" style="display:none;">Save</button>
+      </div>
+      <button class="modal-close" onclick="closeModal('lead-detail-modal')">×</button>
+    </div>
+    <div class="modal-body" id="lead-detail-modal-body"></div>
+  </div>
+</div>
+
+<!-- ADD LEAD MODAL -->
+<div class="modal-overlay" id="add-lead-modal" onclick="closeModalOutside(event,'add-lead-modal')">
+  <div class="modal detail-modal">
+    <div class="modal-hdr">
+      <h2>Add a lead</h2>
+      <button class="modal-close" onclick="closeModal('add-lead-modal')">×</button>
+    </div>
+    <div class="modal-body" id="add-lead-modal-body" style="padding:16px 20px;"></div>
   </div>
 </div>
 
@@ -1025,6 +1117,14 @@ async function applyLoadedData(data) {
   } else {
     switchBtn.style.display = 'none';
   }
+
+  // LEADS FEATURE hook (isolated — see the LEADS FEATURE JS block below
+  // for everything this calls into). Safe to delete this one call plus
+  // the block itself to fully remove the feature.
+  LEADS_ENABLED = !!data.hasLeadsTab;
+  ALL_LEADS = buildLeads(data.leads || []);
+  ALL_LEAD_INTERACTIONS = buildLeadInteractions(data.leadInteractions || []);
+  renderLeadsSection();
 }
 
 // ── CONFIG (Title / Subtitle / Logo / Deadline) ──────────────────────────────
@@ -2075,6 +2175,391 @@ document.getElementById('tbl-body').addEventListener('change', e => {
 document.getElementById('card-body').addEventListener('change', e => {
   if (e.target.classList && e.target.classList.contains('inline-edit-ctrl')) handleInlineFieldChange(e.target);
 });
+
+// ══════════════════════════════════════════════════════════════════════════
+// LEADS FEATURE (isolated, removable block)
+// ----------------------------------------------------------------------------
+// Spec:
+//   Status: New feature — pre-sales lead tracking, kept separate from Tasks.
+//   Screen/Location: new "Leads" section below the Task list; its own two
+//     modals (lead detail + add lead), defined in the HTML above.
+//   Validations: Name is required to add/save a lead; interaction Notes
+//     is required to log an interaction. Everything else is optional free
+//     text — Type and Status are both meant to evolve without code changes.
+//   Calculations (CONFIRMED by user): Status is free text the user sets
+//     directly (e.g. "new warm", "new cold", "in progress", "converted",
+//     "not interested") — so its dropdown is populated dynamically from
+//     whatever values already exist in the sheet (never hardcoded), and
+//     status-pill coloring is done by keyword bucketing (leadStatusBucket)
+//     into active/won/lost rather than one CSS class per exact value.
+//     UNVERIFIED — NEEDS CONFIRMATION: a brand-new status that doesn't
+//     contain any of the won/lost keywords below silently falls into
+//     "active", which is a safe default but worth a glance if a genuinely
+//     new *kind* of outcome (not just a new flavor of in-progress) shows up.
+//   Dependencies: optional Leads / Lead Interactions tabs in the Sheet —
+//     the whole section stays hidden if the Leads tab doesn't exist
+//     (hasLeadsTab from buildPayload_); the generic addRow/updateRow/
+//     deleteRow backend (no sheet-specific backend code needed); and
+//     postToScript/esc/escNl/toISO/showToast/closeModal/closeModalOutside/
+//     pickField from the Task list code above. Explicitly NOT linked to
+//     Tasks or Projects in any way — the user's explicit decision.
+// To remove this feature entirely: delete this JS block, the
+// "LEADS (isolated feature…)" HTML section + its two modals, the "LEADS
+// FEATURE" <style> block, and the one hook call inside applyLoadedData().
+// ══════════════════════════════════════════════════════════════════════════
+const LEAD_FIELD_ALIASES = {
+  srno: ['sr no','sr. no','s.no','sl no','sr.no'],
+  name: ['name','lead name'],
+  type: ['type'],
+  status: ['status'],
+  contact: ['contact','contact details','phone','email'],
+  notes: ['notes','remarks'],
+};
+const LEAD_INTERACTION_ALIASES = {
+  srno: ['sr no','sr. no','s.no','sl no','sr.no'],
+  leadName: ['lead name','name'],
+  date: ['date'],
+  notes: ['notes','remarks','detail','details'],
+};
+
+let LEADS_ENABLED = false;
+let ALL_LEADS = [];
+let ALL_LEAD_INTERACTIONS = [];
+let LEAD_HEADER_MAP = {};
+let LEAD_INTERACTION_HEADER_MAP = {};
+
+function buildLeads(rawRows) {
+  LEAD_HEADER_MAP = {};
+  if (rawRows.length === 0) return [];
+  const sampleKeys = Object.keys(rawRows[0]);
+  for (const field in LEAD_FIELD_ALIASES) {
+    const found = sampleKeys.find(k => LEAD_FIELD_ALIASES[field].includes(k.trim().toLowerCase()));
+    if (found) LEAD_HEADER_MAP[field] = found;
+  }
+  return rawRows.map(row => ({
+    srno: pickField(row, LEAD_FIELD_ALIASES.srno),
+    name: pickField(row, LEAD_FIELD_ALIASES.name),
+    type: pickField(row, LEAD_FIELD_ALIASES.type),
+    status: pickField(row, LEAD_FIELD_ALIASES.status),
+    contact: pickField(row, LEAD_FIELD_ALIASES.contact),
+    notes: pickField(row, LEAD_FIELD_ALIASES.notes),
+  })).filter(l => l.name);
+}
+
+function buildLeadInteractions(rawRows) {
+  LEAD_INTERACTION_HEADER_MAP = {};
+  if (rawRows.length === 0) return [];
+  const sampleKeys = Object.keys(rawRows[0]);
+  for (const field in LEAD_INTERACTION_ALIASES) {
+    const found = sampleKeys.find(k => LEAD_INTERACTION_ALIASES[field].includes(k.trim().toLowerCase()));
+    if (found) LEAD_INTERACTION_HEADER_MAP[field] = found;
+  }
+  return rawRows.map(row => ({
+    srno: pickField(row, LEAD_INTERACTION_ALIASES.srno),
+    leadName: pickField(row, LEAD_INTERACTION_ALIASES.leadName),
+    date: pickField(row, LEAD_INTERACTION_ALIASES.date),
+    notes: pickField(row, LEAD_INTERACTION_ALIASES.notes),
+  })).filter(i => i.leadName);
+}
+
+function leadStatusBucket(status) {
+  const s = (status || '').toLowerCase();
+  if (s.includes('convert') || s.includes('won')) return 'won';
+  if (s.includes('not interested') || s.includes('lost') || s.includes('dead')) return 'lost';
+  return 'active';
+}
+
+function leadPillHTML(status) {
+  const bucket = leadStatusBucket(status);
+  return `<span class="lead-pill lp-${bucket}">${esc(status) || '—'}</span>`;
+}
+
+function leadInteractionsFor(leadName) {
+  const target = (leadName || '').trim().toLowerCase();
+  return ALL_LEAD_INTERACTIONS
+    .filter(i => i.leadName.trim().toLowerCase() === target)
+    .slice()
+    .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0)); // newest first
+}
+
+// ── LEADS: render ───────────────────────────────────────────────────────
+function renderLeadsSection() {
+  const section = document.getElementById('leads-section');
+  if (!LEADS_ENABLED) { section.style.display = 'none'; return; }
+  section.style.display = 'block';
+  buildLeadFilters();
+  renderLeadsTable();
+}
+
+function buildLeadFilters() {
+  const typeSel = document.getElementById('f-lead-type');
+  const statusSel = document.getElementById('f-lead-status');
+  const prevType = typeSel.value;
+  const prevStatus = statusSel.value;
+
+  const types = [...new Set(ALL_LEADS.map(l => l.type).filter(Boolean))].sort();
+  typeSel.innerHTML = '<option value="All">All types</option>';
+  types.forEach(t => { const o = document.createElement('option'); o.value = t; o.textContent = t; typeSel.appendChild(o); });
+  typeSel.value = types.includes(prevType) ? prevType : 'All';
+
+  const statuses = [...new Set(ALL_LEADS.map(l => l.status).filter(Boolean))].sort();
+  statusSel.innerHTML = '<option value="All">All statuses</option>';
+  statuses.forEach(s => { const o = document.createElement('option'); o.value = s; o.textContent = s; statusSel.appendChild(o); });
+  statusSel.value = statuses.includes(prevStatus) ? prevStatus : 'All';
+}
+
+function leadsFiltered() {
+  const type = document.getElementById('f-lead-type').value;
+  const status = document.getElementById('f-lead-status').value;
+  return ALL_LEADS.filter(l =>
+    (type === 'All' || l.type === type) && (status === 'All' || l.status === status)
+  );
+}
+
+function renderLeadsTable() {
+  const leads = leadsFiltered();
+  document.getElementById('lk-total').textContent = ALL_LEADS.length;
+  document.getElementById('lk-active').textContent = ALL_LEADS.filter(l => leadStatusBucket(l.status) === 'active').length;
+  document.getElementById('lk-won').textContent = ALL_LEADS.filter(l => leadStatusBucket(l.status) === 'won').length;
+
+  const tb = document.getElementById('lead-tbl-body');
+  if (leads.length === 0) {
+    tb.innerHTML = `<tr><td colspan="6"><div class="lead-empty">No leads match the current filters.</div></td></tr>`;
+    return;
+  }
+  tb.innerHTML = leads.map((l, i) => `
+    <tr>
+      <td class="td-srno">${esc(l.srno)||'—'}</td>
+      <td><span class="lead-link" onclick="openLeadDetailModal(${i})">${esc(l.name)}</span></td>
+      <td>${esc(l.type)||'—'}</td>
+      <td>${leadPillHTML(l.status)}</td>
+      <td>${esc(l.contact)||'—'}</td>
+      <td class="td-rem">${escNl(l.notes)||'—'}</td>
+    </tr>
+  `).join('');
+  window._sortedLeads = leads;
+}
+
+// ── LEADS: write helpers (generic addRow/updateRow/deleteRow backend) ────
+async function updateLead(srno, changes) {
+  const updates = {};
+  for (const field in changes) { const h = LEAD_HEADER_MAP[field]; if (h) updates[h] = changes[field]; }
+  return postToScript({ action: 'update', sheet: 'Leads', matchField: LEAD_HEADER_MAP.srno, matchValue: srno, updates });
+}
+async function addLead(fields) {
+  const row = {};
+  for (const field in fields) { const h = LEAD_HEADER_MAP[field]; if (h) row[h] = fields[field]; }
+  return postToScript({ action: 'add', sheet: 'Leads', row });
+}
+async function deleteLeadRow(srno) {
+  return postToScript({ action: 'delete', sheet: 'Leads', matchField: LEAD_HEADER_MAP.srno, matchValue: srno });
+}
+async function addLeadInteraction(fields) {
+  const row = {};
+  for (const field in fields) { const h = LEAD_INTERACTION_HEADER_MAP[field]; if (h) row[h] = fields[field]; }
+  return postToScript({ action: 'add', sheet: 'Lead Interactions', row });
+}
+
+// ── LEADS: detail modal (read view + edit mode + interaction timeline) ───
+function openLeadDetailModal(idx) {
+  const l = window._sortedLeads[idx];
+  if (!l) return;
+  window._detailLead = l;
+  document.getElementById('lead-detail-title').textContent = l.name;
+  renderLeadDetailReadOnly(l);
+  document.getElementById('lead-edit-btn').style.display = '';
+  document.getElementById('lead-delete-btn').style.display = '';
+  document.getElementById('lead-cancel-btn').style.display = 'none';
+  document.getElementById('lead-save-btn').style.display = 'none';
+  document.getElementById('lead-detail-modal').classList.add('open');
+}
+
+function leadInteractionTimelineHTML(leadName) {
+  const items = leadInteractionsFor(leadName);
+  const list = items.length === 0
+    ? '<div class="lead-empty" style="padding:10px 0;">No interactions logged yet.</div>'
+    : items.map(i => `
+        <div class="lead-interaction-item">
+          <div class="lead-interaction-date">${esc(i.date)||'—'}</div>
+          <div class="lead-interaction-notes">${escNl(i.notes)}</div>
+        </div>
+      `).join('');
+  return `
+    <div class="detail-row" style="flex-direction:column; border-bottom:none;">
+      <div class="detail-lbl" style="margin-bottom:6px;">Interaction Timeline</div>
+      <div class="detail-val" style="width:100%;">
+        ${list}
+        <div class="lead-add-interaction">
+          <input type="date" id="li-add-date" value="${toISO(new Date())}">
+          <textarea id="li-add-notes" placeholder="Log a new interaction…"></textarea>
+          <button class="modal-hdr-btn primary" style="margin:0;" onclick="submitLeadInteraction()">Log</button>
+        </div>
+        <div class="save-err" id="li-add-error" style="display:none;"></div>
+      </div>
+    </div>
+  `;
+}
+
+async function submitLeadInteraction() {
+  const l = window._detailLead;
+  if (!l) return;
+  const date = document.getElementById('li-add-date').value;
+  const notes = document.getElementById('li-add-notes').value.trim();
+  const errEl = document.getElementById('li-add-error');
+  errEl.style.display = 'none';
+  if (!notes) { errEl.textContent = 'Enter a note before logging.'; errEl.style.display = 'block'; return; }
+  const res = await addLeadInteraction({ leadName: l.name, date, notes });
+  if (res.success) {
+    ALL_LEAD_INTERACTIONS.push({ srno: res.srNo != null ? String(res.srNo) : '', leadName: l.name, date, notes });
+    renderLeadDetailReadOnly(l);
+  } else {
+    errEl.textContent = 'Could not save: ' + (res.error || 'unknown error');
+    errEl.style.display = 'block';
+  }
+}
+
+function renderLeadDetailReadOnly(l) {
+  document.getElementById('lead-detail-modal-body').innerHTML = `
+    <div class="detail-row"><div class="detail-lbl">Type</div><div class="detail-val">${esc(l.type)||'—'}</div></div>
+    <div class="detail-row"><div class="detail-lbl">Status</div><div class="detail-val">${leadPillHTML(l.status)}</div></div>
+    <div class="detail-row"><div class="detail-lbl">Contact</div><div class="detail-val">${esc(l.contact)||'—'}</div></div>
+    <div class="detail-row"><div class="detail-lbl">Notes</div><div class="detail-val">${escNl(l.notes)||'—'}</div></div>
+    ${leadInteractionTimelineHTML(l.name)}
+  `;
+}
+
+function startLeadEditMode() {
+  const l = window._detailLead;
+  if (!l) return;
+  const types = [...new Set(ALL_LEADS.map(x => x.type).filter(Boolean))].sort();
+  const statuses = [...new Set(ALL_LEADS.map(x => x.status).filter(Boolean))].sort();
+  document.getElementById('lead-detail-modal-body').innerHTML = `
+    <div class="detail-row"><div class="detail-lbl">Name</div><div class="detail-val"><input type="text" id="le-name" value="${esc(l.name)}"></div></div>
+    <div class="detail-row"><div class="detail-lbl">Type</div><div class="detail-val">
+      <input type="text" id="le-type" list="le-type-list" value="${esc(l.type)}">
+      <datalist id="le-type-list">${types.map(t=>`<option value="${esc(t)}">`).join('')}</datalist>
+    </div></div>
+    <div class="detail-row"><div class="detail-lbl">Status</div><div class="detail-val">
+      <input type="text" id="le-status" list="le-status-list" value="${esc(l.status)}">
+      <datalist id="le-status-list">${statuses.map(s=>`<option value="${esc(s)}">`).join('')}</datalist>
+    </div></div>
+    <div class="detail-row"><div class="detail-lbl">Contact</div><div class="detail-val"><input type="text" id="le-contact" value="${esc(l.contact)}"></div></div>
+    <div class="detail-row"><div class="detail-lbl">Notes</div><div class="detail-val"><textarea id="le-notes">${esc(l.notes)}</textarea></div></div>
+    <div class="save-err" id="le-error" style="display:none;"></div>
+  `;
+  document.getElementById('lead-edit-btn').style.display = 'none';
+  document.getElementById('lead-delete-btn').style.display = 'none';
+  document.getElementById('lead-cancel-btn').style.display = '';
+  document.getElementById('lead-save-btn').style.display = '';
+}
+
+function cancelLeadEditMode() {
+  const l = window._detailLead;
+  renderLeadDetailReadOnly(l);
+  document.getElementById('lead-edit-btn').style.display = '';
+  document.getElementById('lead-delete-btn').style.display = '';
+  document.getElementById('lead-cancel-btn').style.display = 'none';
+  document.getElementById('lead-save-btn').style.display = 'none';
+}
+
+async function saveLeadEditMode() {
+  const l = window._detailLead;
+  if (!l) return;
+  const errEl = document.getElementById('le-error');
+  errEl.style.display = 'none';
+  const newName = document.getElementById('le-name').value.trim();
+  if (!newName) { errEl.textContent = 'Name cannot be empty.'; errEl.style.display = 'block'; return; }
+
+  const changes = {
+    name: newName,
+    type: document.getElementById('le-type').value.trim(),
+    status: document.getElementById('le-status').value.trim(),
+    contact: document.getElementById('le-contact').value.trim(),
+    notes: document.getElementById('le-notes').value.trim(),
+  };
+  const res = await updateLead(l.srno, changes);
+  if (!res.success) {
+    errEl.textContent = 'Could not save: ' + (res.error || 'unknown error');
+    errEl.style.display = 'block';
+    return;
+  }
+  l.name = changes.name; l.type = changes.type; l.status = changes.status;
+  l.contact = changes.contact; l.notes = changes.notes;
+  closeModal('lead-detail-modal');
+  showToast('Lead updated ✓', false);
+  renderLeadsSection();
+}
+
+async function confirmDeleteLead() {
+  const l = window._detailLead;
+  if (!l || !l.srno) return;
+  const ok = confirm(`Delete lead "${l.name}"? This can't be undone from the dashboard.`);
+  if (!ok) return;
+  const btn = document.getElementById('lead-delete-btn');
+  btn.disabled = true; btn.textContent = 'Deleting…';
+  const res = await deleteLeadRow(l.srno);
+  btn.disabled = false; btn.textContent = '🗑 Delete';
+  if (res.success) {
+    ALL_LEADS = ALL_LEADS.filter(x => String(x.srno) !== String(l.srno));
+    closeModal('lead-detail-modal');
+    renderLeadsSection();
+    showToast('Lead deleted', false);
+  } else {
+    showToast('Could not delete: ' + (res.error || 'unknown error'), true);
+  }
+}
+
+// ── LEADS: add-lead modal ────────────────────────────────────────────────
+function openAddLeadModal() {
+  const types = [...new Set(ALL_LEADS.map(l => l.type).filter(Boolean))].sort();
+  const statuses = [...new Set(ALL_LEADS.map(l => l.status).filter(Boolean))].sort();
+  document.getElementById('add-lead-modal-body').innerHTML = `
+    <div class="detail-row"><div class="detail-lbl">Name</div><div class="detail-val"><input type="text" id="al-name" placeholder="College / contact name"></div></div>
+    <div class="detail-row"><div class="detail-lbl">Type</div><div class="detail-val">
+      <input type="text" id="al-type" list="al-type-list" placeholder="Pick or type new">
+      <datalist id="al-type-list">${types.map(t=>`<option value="${esc(t)}">`).join('')}</datalist>
+    </div></div>
+    <div class="detail-row"><div class="detail-lbl">Status</div><div class="detail-val">
+      <input type="text" id="al-status" list="al-status-list" placeholder="e.g. new warm">
+      <datalist id="al-status-list">${statuses.map(s=>`<option value="${esc(s)}">`).join('')}</datalist>
+    </div></div>
+    <div class="detail-row"><div class="detail-lbl">Contact</div><div class="detail-val"><input type="text" id="al-contact" placeholder="Phone / email"></div></div>
+    <div class="detail-row"><div class="detail-lbl">Notes</div><div class="detail-val"><textarea id="al-notes" placeholder="Optional"></textarea></div></div>
+    <div class="detail-row" style="border-bottom:none;"><div class="detail-lbl"></div><div class="detail-val">
+      <button class="modal-hdr-btn" id="al-submit-btn" style="background:var(--teal);color:var(--white);border-color:var(--teal);" onclick="submitAddLeadModal()">Add lead</button>
+      <div class="save-err" id="al-error" style="display:none;"></div>
+    </div></div>
+  `;
+  document.getElementById('add-lead-modal').classList.add('open');
+}
+
+async function submitAddLeadModal() {
+  const name = document.getElementById('al-name').value.trim();
+  const errEl = document.getElementById('al-error');
+  errEl.style.display = 'none';
+  if (!name) { errEl.textContent = 'Please enter a name.'; errEl.style.display = 'block'; return; }
+  const fields = {
+    name,
+    type: document.getElementById('al-type').value.trim(),
+    status: document.getElementById('al-status').value.trim(),
+    contact: document.getElementById('al-contact').value.trim(),
+    notes: document.getElementById('al-notes').value.trim(),
+  };
+  const btn = document.getElementById('al-submit-btn');
+  btn.disabled = true; btn.textContent = 'Saving…';
+  const res = await addLead(fields);
+  if (res.success) {
+    closeModal('add-lead-modal');
+    ALL_LEADS.push({ srno: res.srNo != null ? String(res.srNo) : '', ...fields });
+    renderLeadsSection();
+    showToast('Lead added ✓', false);
+  } else {
+    btn.disabled = false; btn.textContent = 'Add lead';
+    errEl.textContent = 'Could not save: ' + (res.error || 'unknown error');
+    errEl.style.display = 'block';
+  }
+}
+// ══ END LEADS FEATURE ══
 
 loadData();
 </script>
