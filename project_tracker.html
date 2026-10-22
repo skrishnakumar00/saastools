@@ -471,6 +471,22 @@ body.hide-project .col-project { display: none !important; }
 .lead-add-interaction textarea { flex: 1; min-width: 160px; border: 1.5px solid var(--border); border-radius: 6px; padding: 6px 9px; font-size: 12.5px; font-family: 'Inter', sans-serif; min-height: 36px; resize: vertical; }
 .lead-empty { padding: 24px; text-align: center; color: var(--muted); font-size: 13px; }
 </style>
+<style>
+/* ══ JUMP NAV (isolated — remove this <style> block + the "JUMP NAV" div
+   in <main> + the jumpTo()/syncJumpNav() JS block to remove the feature) ══ */
+.jumpnav { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+.jumpnav-item {
+  font-size: 11.5px; font-weight: 600; color: var(--teal-dark);
+  background: var(--teal-light); border: 1px solid var(--border);
+  border-radius: 20px; padding: 5px 12px; cursor: pointer; white-space: nowrap;
+  transition: background 0.15s;
+}
+.jumpnav-item:hover { background: #dcedee; }
+.notes-project-tag {
+  display: inline-block; font-size: 9.5px; font-weight: 700; color: var(--teal-dark);
+  background: var(--teal-light); border-radius: 8px; padding: 1px 7px; margin-right: 6px; vertical-align: middle;
+}
+</style>
 </head>
 <body>
 
@@ -582,6 +598,16 @@ body.hide-project .col-project { display: none !important; }
 </div>
 
 <main>
+  <!-- ══ JUMP NAV (isolated — delete this div + its <style> block + the
+       jumpTo()/syncJumpNav() JS block to remove the feature). Each item
+       hides itself automatically when its section has nothing to show. ══ -->
+  <div class="jumpnav" id="jumpnav">
+    <span class="jumpnav-item" id="jumpnav-notes" onclick="jumpTo('notes-card')">📌 Key Objectives</span>
+    <span class="jumpnav-item" id="jumpnav-targets" onclick="jumpTo('progress-section')">🎯 Targets</span>
+    <span class="jumpnav-item" id="jumpnav-tasks" onclick="jumpTo('tasks-anchor')">✅ Tasks</span>
+    <span class="jumpnav-item" id="jumpnav-leads" onclick="jumpTo('leads-section')">🧲 Leads</span>
+  </div>
+
   <div id="error-banner"></div>
 
   <!-- KEY OBJECTIVES & DECISIONS -->
@@ -677,7 +703,7 @@ body.hide-project .col-project { display: none !important; }
   </div>
 
   <!-- TASK LIST -->
-  <div class="sec-label" style="margin-top:24px;">Task list</div>
+  <div class="sec-label" id="tasks-anchor" style="margin-top:24px;">Task list</div>
   <div class="tbl-wrap" id="tbl-wrap">
     <div class="tbl-toolbar">
       <h3 id="tbl-title">All tasks</h3>
@@ -810,7 +836,7 @@ const FIELD_ALIASES = {
   remarks:  ['remarks','notes'],
   project:  ['project'],
 };
-const NOTES_ALIASES  = { heading: ['heading','point','topic','title'], detail: ['detail','details','description','notes'] };
+const NOTES_ALIASES  = { heading: ['heading','point','topic','title'], detail: ['detail','details','description','notes'], project: ['project'] };
 const TARGETS_ALIASES = {
   cat: ['category'], target: ['target','planned'], actual: ['actual','done','completed'],
   desc: ['description','desc','details'], owner: ['owner','responsibility','responsible'],
@@ -1104,7 +1130,8 @@ async function applyLoadedData(data) {
   document.getElementById('last-refresh').textContent =
     new Date().toLocaleTimeString('en-IN', {hour:'2-digit', minute:'2-digit'});
 
-  renderNotes(buildNotes(data.notes || []));
+  ALL_NOTES = buildNotes(data.notes || []);
+  renderNotesSection();
 
   const targetRows = buildTargets(data.targets || []);
   renderProgress(targetRows);
@@ -1125,6 +1152,10 @@ async function applyLoadedData(data) {
   ALL_LEADS = buildLeads(data.leads || []);
   ALL_LEAD_INTERACTIONS = buildLeadInteractions(data.leadInteractions || []);
   renderLeadsSection();
+
+  // JUMP NAV hook (isolated — see the JUMP NAV JS block below). Called
+  // last so it sees the final shown/hidden state of every section above.
+  syncJumpNav();
 }
 
 // ── CONFIG (Title / Subtitle / Logo / Deadline) ──────────────────────────────
@@ -1213,6 +1244,7 @@ function buildNotes(rawRows) {
   return rawRows.map(row => ({
     heading: pickField(row, NOTES_ALIASES.heading),
     detail: pickField(row, NOTES_ALIASES.detail),
+    project: pickField(row, NOTES_ALIASES.project),
   })).filter(n => n.heading);
 }
 
@@ -1441,6 +1473,7 @@ function render() {
   document.getElementById('tbl-title').textContent = owner==='All' ? 'All tasks' : `Tasks — ${owner}`;
   document.getElementById('add-task-btn').style.display = EDITABLE ? 'inline-block' : 'none';
   updateMyTasksUI();
+  renderNotesSection(); // keeps Key Objectives in sync whenever the Project filter changes
 }
 
 function renderKPIs(tasks) {
@@ -1645,12 +1678,24 @@ function renderTaskList() {
 }
 
 // ── NOTES ────────────────────────────────────────────────────────────────────
-function renderNotes(notes) {
+// Project-aware (isolated addition): if a Notes row has a Project value,
+// selecting a specific project in the existing f-project dropdown filters
+// Key Objectives down to that project's notes; "All" shows every note with
+// a small project tag so it's clear which project each one belongs to.
+// Notes without any Project value (no Project column on the Notes tab at
+// all) are completely unaffected — they always show, untagged, as before.
+let ALL_NOTES = [];
+function renderNotesSection() {
+  const p = (HAS.project && document.getElementById('f-project')) ? document.getElementById('f-project').value : 'All';
+  const visible = (p === 'All') ? ALL_NOTES : ALL_NOTES.filter(n => n.project === p);
+  renderNotes(visible, p === 'All');
+}
+function renderNotes(notes, showProjectTag) {
   const body = document.getElementById('notes-body');
   if (!notes || notes.length === 0) { body.innerHTML = '<div class="notes-empty">No notes added yet.</div>'; return; }
   body.innerHTML = notes.map(n => `
     <div class="notes-item">
-      <div class="notes-item-h">${esc(n.heading)}</div>
+      <div class="notes-item-h">${showProjectTag && n.project ? `<span class="notes-project-tag">${esc(n.project)}</span>` : ''}${esc(n.heading)}</div>
       ${n.detail ? `<div class="notes-item-d">${escNl(n.detail)}</div>` : ''}
     </div>
   `).join('');
@@ -2560,6 +2605,51 @@ async function submitAddLeadModal() {
   }
 }
 // ══ END LEADS FEATURE ══
+
+// ══════════════════════════════════════════════════════════════════════════
+// JUMP NAV (isolated, removable block)
+// ----------------------------------------------------------------------------
+// Spec:
+//   Status: New feature — a sticky row of "jump to section" links at the
+//     top of the page (Key Objectives / Targets / Tasks / Leads) so a new
+//     user sees what's in the tool immediately, instead of discovering
+//     sections only by scrolling. Pure navigation — no new data, no new
+//     filters; just scrollIntoView to an existing section's id.
+//   Screen/Location: top of <main>, above the error banner.
+//   Validations: none (click-only UI).
+//   Calculations (CONFIRMED by user): a nav item hides itself whenever its
+//     section is currently hidden/empty — Targets already hides itself
+//     when there are no Targets rows, and Leads already hides itself when
+//     the sheet has no Leads tab; syncJumpNav() just mirrors each
+//     section's own existing display state, it introduces no new
+//     show/hide logic of its own. Key Objectives has no empty/hidden
+//     state today (it always shows a "No notes added yet" placeholder
+//     instead of disappearing), so its nav item is always shown — flagging
+//     this because it's the one case that doesn't disappear when "empty",
+//     in case that's not what was intended; happy to also hide the Key
+//     Objectives section itself when there are zero notes if so. Tasks
+//     has no empty/hidden state either, so its nav item is always shown.
+//   Dependencies: the notes-card / progress-section / leads-section ids
+//     and their existing display:none toggles; the tasks-anchor id added
+//     next to the Task list section label.
+// To remove this feature entirely: delete this JS block, the "JUMP NAV"
+// div in <main>, the "JUMP NAV" <style> block, and the one syncJumpNav()
+// call inside applyLoadedData().
+// ══════════════════════════════════════════════════════════════════════════
+function jumpTo(id) {
+  const el = document.getElementById(id);
+  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+function syncJumpNav() {
+  const notesVisible = document.getElementById('notes-card').style.display !== 'none';
+  const targetsVisible = document.getElementById('progress-section').style.display !== 'none';
+  const leadsVisible = document.getElementById('leads-section').style.display !== 'none';
+  document.getElementById('jumpnav-notes').style.display = notesVisible ? '' : 'none';
+  document.getElementById('jumpnav-targets').style.display = targetsVisible ? '' : 'none';
+  document.getElementById('jumpnav-leads').style.display = leadsVisible ? '' : 'none';
+  // Tasks has no hidden/empty state today, so jumpnav-tasks is never hidden.
+}
+// ══ END JUMP NAV ══
 
 loadData();
 </script>
