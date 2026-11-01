@@ -1,0 +1,782 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Income — Tuition and School</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg: #12161c;
+    --surface: #1a2029;
+    --surface-2: #212836;
+    --line: #2b3342;
+    --line-strong: #3a4458;
+    --ink: #e9e6dc;
+    --ink-dim: #8d94a3;
+    --received: #5fa8a0;
+    --pending: #d9a25c;
+    --warn: #cf6b56;
+    --focus: #d9a25c;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--ink);
+    font-family:'Inter', sans-serif;
+    padding: 32px 20px 80px;
+  }
+  .wrap{max-width:1040px;margin:0 auto;}
+  header{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-end;
+    flex-wrap:wrap;
+    gap:16px;
+    margin-bottom:28px;
+    border-bottom:1px solid var(--line);
+    padding-bottom:20px;
+  }
+  h1{
+    font-family:'Space Grotesk',sans-serif;
+    font-weight:700;
+    font-size:28px;
+    margin:0;
+    letter-spacing:-0.02em;
+  }
+  h1 span{color:var(--pending);}
+  .sub{color:var(--ink-dim);font-size:13px;margin-top:4px;}
+  .updated{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--ink-dim);text-align:right;}
+  .head-right{display:flex;align-items:center;gap:10px;}
+  #refreshBtn{
+    background:var(--surface);
+    border:1px solid var(--line);
+    color:var(--ink-dim);
+    padding:7px 14px;
+    border-radius:20px;
+    font-size:12px;
+    cursor:pointer;
+    font-family:'Inter',sans-serif;
+  }
+  #refreshBtn:hover{color:var(--ink);}
+
+  .config{
+    background:var(--surface);
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:14px 18px;
+    margin-bottom:20px;
+    display:none;
+  }
+  .config.open{display:block;}
+  .config-grid{display:grid;grid-template-columns:1fr;gap:10px;}
+  .field label{display:block;font-size:11px;color:var(--ink-dim);margin-bottom:5px;font-family:'IBM Plex Mono',monospace;letter-spacing:0.03em;}
+  .field input[type=text]{
+    width:100%;
+    background:var(--surface-2);
+    border:1px solid var(--line);
+    border-radius:6px;
+    padding:9px 11px;
+    color:var(--ink);
+    font-family:'IBM Plex Mono',monospace;
+    font-size:12px;
+  }
+  .field input:focus{outline:none;border-color:var(--focus);}
+  .config button{
+    margin-top:2px;
+    background:var(--pending);
+    color:#1a1400;
+    border:none;
+    border-radius:6px;
+    padding:9px 16px;
+    font-weight:600;
+    font-size:13px;
+    cursor:pointer;
+    font-family:'Inter',sans-serif;
+  }
+  .config button:hover{filter:brightness(1.08);}
+  .status{font-size:12px;margin-top:8px;font-family:'IBM Plex Mono',monospace;}
+  .status.err{color:var(--warn);}
+  .status.ok{color:#6f9f7c;}
+
+  .periods{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:22px;align-items:center;}
+  .periods button, .periods select, .periods input[type=text]{
+    background:var(--surface);
+    border:1px solid var(--line);
+    color:var(--ink-dim);
+    padding:7px 14px;
+    border-radius:20px;
+    font-size:12px;
+    cursor:pointer;
+    font-family:'Inter',sans-serif;
+  }
+  .periods input[type=text]{cursor:text;color:var(--ink);min-width:200px;}
+  .periods input[type=text]:focus{outline:none;border-color:var(--focus);}
+  .periods button.active{
+    background:var(--pending);
+    color:#1a1400;
+    border-color:var(--pending);
+    font-weight:600;
+  }
+  .periods select{padding:7px 10px;}
+  .periods .gap{flex:1;}
+  .periods .label{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--ink-dim);}
+
+  .nav{display:flex;gap:4px;margin-bottom:22px;border-bottom:1px solid var(--line);}
+  .nav button{
+    background:none;border:none;color:var(--ink-dim);
+    padding:10px 16px;margin-bottom:-1px;
+    font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:14px;
+    cursor:pointer;border-bottom:2px solid transparent;
+  }
+  .nav button.active{color:var(--ink);border-bottom-color:var(--pending);}
+  .view{display:none;}
+  .view.active{display:block;}
+
+  .summary-row{display:flex;gap:14px;margin-bottom:26px;flex-wrap:wrap;}
+  .stat{
+    flex:1;
+    min-width:150px;
+    background:var(--surface);
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:14px 16px;
+  }
+  .stat .num{font-family:'Space Grotesk',sans-serif;font-size:24px;font-weight:700;}
+  .stat .lbl{font-size:11px;color:var(--ink-dim);margin-top:2px;font-family:'IBM Plex Mono',monospace;}
+  .stat.rec .num{color:var(--received);}
+  .stat.pend .num{color:var(--pending);}
+
+  h2{
+    font-family:'Space Grotesk',sans-serif;
+    font-size:15px;
+    font-weight:600;
+    margin:26px 0 10px;
+  }
+  .tblwrap{overflow-x:auto;margin-bottom:6px;}
+  table.ledger{
+    width:100%;
+    border-collapse:collapse;
+    background:var(--surface);
+    border:1px solid var(--line);
+    font-size:13px;
+  }
+  table.ledger thead th{
+    text-align:right;
+    font-family:'IBM Plex Mono',monospace;
+    font-size:10.5px;
+    letter-spacing:0.03em;
+    color:var(--ink-dim);
+    font-weight:500;
+    padding:12px 16px;
+    border-bottom:1px solid var(--line);
+    white-space:nowrap;
+  }
+  table.ledger thead th.l, table.ledger td.l{text-align:left;}
+  table.ledger thead th.sortable{cursor:pointer;user-select:none;}
+  table.ledger thead th.sortable:hover{color:var(--ink);}
+  table.ledger td{
+    padding:12px 16px;
+    border-bottom:1px solid var(--line);
+    text-align:right;
+    font-family:'IBM Plex Mono',monospace;
+    white-space:nowrap;
+  }
+  table.ledger td.l{font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:13.5px;}
+  table.ledger tr:last-child td{border-bottom:none;}
+  table.ledger tr.click{cursor:pointer;}
+  table.ledger tr.click:hover td{background:var(--surface-2);}
+  table.ledger tr.total td{font-weight:700;border-top:1px solid var(--line-strong);}
+  table.ledger tr.sel td{background:rgba(217,162,92,0.07);}
+  table.ledger tr.cmp td{background:rgba(95,168,160,0.07);}
+  table.ledger tr.detail > td{background:var(--surface-2);text-align:left;padding:10px 16px 16px;white-space:normal;}
+  .rec{color:var(--received);}
+  .pend{color:var(--pending);}
+  .dim{color:var(--ink-dim);}
+  .bar{display:inline-block;width:64px;height:6px;background:var(--surface-2);border-radius:3px;vertical-align:middle;margin-left:8px;overflow:hidden;}
+  .bar i{display:block;height:100%;background:var(--received);}
+  .chip{
+    font-family:'IBM Plex Mono',monospace;font-size:10.5px;padding:2px 9px;border-radius:12px;
+    border:1px solid var(--line);white-space:nowrap;margin-left:8px;font-weight:400;
+  }
+  .chip.left{color:var(--ink-dim);border-style:dashed;}
+  .chip.excess{color:#7cc4bb;border-color:#3d6f69;}
+  .chip.late{color:#e0a458;border-color:#8a6a35;background:rgba(224,164,88,0.08);}
+  table.inner{width:100%;border-collapse:collapse;font-size:12.5px;}
+  table.inner th{
+    text-align:right;font-family:'IBM Plex Mono',monospace;font-size:10.5px;font-weight:500;
+    color:var(--ink-dim);padding:6px 10px;border-bottom:1px solid var(--line);
+  }
+  table.inner td{padding:7px 10px;text-align:right;font-family:'IBM Plex Mono',monospace;border-bottom:1px solid var(--line);}
+  table.inner th.l, table.inner td.l{text-align:left;}
+  table.ledger table.inner td.l{font-family:'IBM Plex Mono',monospace;font-weight:400;font-size:12.5px;}
+  table.inner tr:last-child td{border-bottom:none;}
+  .remarks{font-size:12.5px;color:var(--ink-dim);margin-bottom:10px;}
+
+  .warn{
+    border:1px solid #7a3d31;background:rgba(207,107,86,0.08);border-radius:10px;
+    padding:12px 16px;margin-bottom:20px;font-size:13px;
+  }
+  .warn summary{cursor:pointer;color:var(--warn);font-weight:600;}
+  .warn ul{margin:8px 0 0;padding-left:18px;font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--ink);}
+  .empty{padding:40px 20px;text-align:center;color:var(--ink-dim);font-size:13px;line-height:1.6;}
+
+  footer{margin-top:24px;font-size:11px;color:var(--ink-dim);text-align:center;font-family:'IBM Plex Mono',monospace;}
+  footer button{
+    background:none;border:none;color:var(--ink-dim);cursor:pointer;
+    font-family:'IBM Plex Mono',monospace;font-size:11px;text-decoration:underline;
+    padding:0;margin-left:4px;
+  }
+  footer button:hover{color:var(--ink);}
+
+  /* keep last: narrow-screen overrides must come after the base rules */
+  @media (max-width:600px){
+    body{padding:24px 14px 60px;}
+    table.ledger thead th{padding:10px 8px;font-size:10px;}
+    table.ledger td{padding:11px 8px;font-size:12px;}
+    .stat{min-width:130px;}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Income<span>.</span></h1>
+      <div class="sub">Tuition and school fees, received and pending</div>
+    </div>
+    <div class="head-right">
+      <div class="updated" id="lastUpdated"></div>
+      <button id="refreshBtn">↻ Refresh</button>
+    </div>
+  </header>
+
+  <div class="config" id="configBox">
+    <div class="config-grid">
+      <div class="field">
+        <label for="apiUrl">Apps Script Web App URL (ends in /exec)</label>
+        <input type="text" id="apiUrl" placeholder="https://script.google.com/macros/s/XXXXX/exec">
+      </div>
+      <button id="saveBtn">Save &amp; load</button>
+      <div class="status" id="status"></div>
+    </div>
+  </div>
+
+  <div id="warnings"></div>
+
+  <div class="periods" id="yearPills"></div>
+
+  <nav class="nav" id="nav">
+    <button data-view="summary" class="active">Summary</button>
+    <button data-view="students">Students</button>
+    <button data-view="school">School</button>
+    <button data-view="compare">Compare</button>
+  </nav>
+
+  <div class="view active" id="viewSummary"></div>
+  <div class="view" id="viewStudents"></div>
+  <div class="view" id="viewSchool"></div>
+  <div class="view" id="viewCompare"></div>
+
+  <footer>Data lives in your Google Sheet — this page only reads it.<button id="configToggle">⚙ connection settings</button></footer>
+</div>
+
+<script>
+const LS_API = 'tuition_api_url';
+const DEFAULT_API_URL = 'https://script.google.com/macros/s/AKfycbwUzqZxz0Wyzkz-VnznLVARf5vcHhJkG-g6diz-4LrqwtPpbiHhU1wesZuBMTKgi5ynwA/exec';
+
+// Fixed Apr–Mar order (CONFIRMED in the data model). Calendar names are for display.
+const MONTHS = ['Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec','Jan','Feb','Mar'];
+const CAL_MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+const S = { students: [], payments: [], school: [], batches: [], years: [], unmatched: [], duplicates: [] };
+const st = {
+  year: '', view: 'summary', batch: 'All', q: '', pendingOnly: false, excludeLeft: false,
+  sortKey: 'pending', sortDir: -1, open: new Set(), cmp: '', loaded: false
+};
+
+const $ = id => document.getElementById(id);
+
+// ===== small helpers =====
+function norm(k){ return String(k).toLowerCase().replace(/[^a-z]/g, ''); }
+function findVal(row, needle){
+  const keys = Object.keys(row);
+  const key = keys.find(k => norm(k) === needle) || keys.find(k => norm(k).startsWith(needle));
+  return key ? row[key] : undefined;
+}
+function txt(v){ return v === undefined || v === null ? '' : String(v).trim(); }
+function clean(v){ return txt(v).replace(/\s+/g, ' '); }
+function num(v){ return parseFloat(String(v === undefined || v === null ? '' : v).replace(/[₹,\s]/g, '')) || 0; }
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+// Dates are calendar days with no time zone, so they are parsed as local dates.
+function parseLocalDate(v){
+  const s = txt(v);
+  if (!s) return null;
+  const m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (m) return new Date(+m[1], +m[2]-1, +m[3]);
+  const d = new Date(s);
+  return isNaN(d) ? null : new Date(d.getFullYear(), d.getMonth(), d.getDate());
+}
+function fmtDay(d){ return d ? d.getDate() + ' ' + CAL_MONTHS[d.getMonth()] + ' ' + d.getFullYear() : ''; }
+function fmt(n){ return Math.round(n).toLocaleString('en-IN'); }
+function rs(n){ return '₹' + fmt(n); }
+function cell(n){ return n ? fmt(n) : '<span class="dim">–</span>'; }
+function signed(n){ return (n > 0 ? '+' : n < 0 ? '−' : '') + fmt(Math.abs(n)); }
+function fyLabel(startYear){ return startYear + '-' + String((startYear + 1) % 100).padStart(2, '0'); }
+function fyStart(label){ return parseInt(String(label).slice(0, 4), 10); }
+function fyOfDate(d){ return d.getMonth() >= 3 ? d.getFullYear() : d.getFullYear() - 1; }
+function monthIdx(name){
+  const s = txt(name);
+  if (!s) return -1;
+  return MONTHS.indexOf(s.charAt(0).toUpperCase() + s.slice(1, 3).toLowerCase());
+}
+// calendar year and 0-based calendar month of Apr–Mar slot i in an academic year
+function slotYear(label, i){ return fyStart(label) + (i <= 8 ? 0 : 1); }
+function slotMonth(i){ return (i + 3) % 12; }
+
+// ===== load =====
+window.addEventListener('DOMContentLoaded', () => {
+  const saved = localStorage.getItem(LS_API) || DEFAULT_API_URL;
+  $('apiUrl').value = saved;
+
+  $('configToggle').addEventListener('click', () => $('configBox').classList.toggle('open'));
+  $('saveBtn').addEventListener('click', () => {
+    localStorage.setItem(LS_API, $('apiUrl').value.trim());
+    loadAll();
+  });
+  $('refreshBtn').addEventListener('click', loadAll);
+  document.querySelectorAll('#nav button').forEach(btn => btn.addEventListener('click', () => setView(btn.dataset.view)));
+  $('yearPills').addEventListener('click', onControlClick);
+  $('viewSummary').addEventListener('click', onViewClick);
+  $('viewStudents').addEventListener('click', onViewClick);
+  $('viewCompare').addEventListener('change', e => {
+    if (e.target.id === 'cmpSelect'){ st.cmp = e.target.value; renderView(); }
+  });
+  $('viewStudents').addEventListener('input', e => {
+    if (e.target.id === 'searchBox'){
+      st.q = e.target.value;
+      const pos = e.target.selectionStart;
+      renderStudents();
+      const box = $('searchBox'); box.focus(); box.setSelectionRange(pos, pos);
+    }
+  });
+
+  if (saved) loadAll();
+  else { setStatus('Add your Apps Script Web App URL first.', 'err'); $('configBox').classList.add('open'); }
+});
+
+function setStatus(msg, cls){
+  const el = $('status');
+  el.textContent = msg;
+  el.className = 'status ' + (cls || '');
+}
+
+async function loadAll(){
+  const apiUrl = $('apiUrl').value.trim();
+  if (!apiUrl){ setStatus('Add your Apps Script Web App URL first.', 'err'); $('configBox').classList.add('open'); return; }
+  setStatus('Loading…');
+  try{
+    const res = await fetch(apiUrl, { cache: 'no-store' });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    buildModel(data);
+    st.loaded = true;
+    setStatus(`Loaded ${S.students.length} student rows, ${S.payments.length} payments, ${S.school.length} school receipts.`, 'ok');
+    $('lastUpdated').textContent = 'synced ' + new Date().toLocaleTimeString();
+    renderAll();
+  }catch(e){
+    setStatus('Could not load: ' + e.message + ' — check the Web App URL and that access is set to "Anyone".', 'err');
+    $('configBox').classList.add('open');
+  }
+}
+
+function buildModel(data){
+  const lists = data.lists || {};
+  const listVals = name => {
+    const k = Object.keys(lists).find(k => norm(k) === name);
+    return k ? lists[k].map(clean).filter(Boolean) : [];
+  };
+
+  S.students = (data.students || []).map(r => ({
+    year: clean(findVal(r, 'academicyear')),
+    name: clean(findVal(r, 'studentname')),
+    batch: clean(findVal(r, 'batch')),
+    agreed: num(findVal(r, 'agreedfee')),
+    status: clean(findVal(r, 'status')).toLowerCase() === 'left' ? 'Left' : 'Active',
+    remarks: txt(findVal(r, 'remarks'))
+  })).filter(r => r.name && r.year);
+  S.students.forEach(s => { s.key = s.name + ' | ' + s.batch + ' | ' + s.year; });
+
+  S.payments = (data.payments || []).map(r => ({
+    date: parseLocalDate(findVal(r, 'date')),
+    student: clean(findVal(r, 'student')),
+    amount: num(findVal(r, 'amount')),
+    mode: txt(findVal(r, 'mode')),
+    note: txt(findVal(r, 'note'))
+  })).filter(r => r.student && r.amount);
+
+  S.school = (data.school || []).map(r => ({
+    year: clean(findVal(r, 'academicyear')),
+    month: monthIdx(findVal(r, 'month')),
+    amount: num(findVal(r, 'amountreceived')),
+    date: parseLocalDate(findVal(r, 'datereceived')),
+    note: txt(findVal(r, 'note'))
+  })).filter(r => r.year && r.month >= 0 && r.amount);
+
+  // link payments to student-year rows by key; a repeated key keeps its payments on the first row only
+  const byKey = new Map();
+  S.payments.forEach(p => {
+    if (!byKey.has(p.student)) byKey.set(p.student, []);
+    byKey.get(p.student).push(p);
+  });
+  byKey.forEach(a => a.sort((x, y) => (x.date || 0) - (y.date || 0)));
+  const seen = new Set();
+  S.duplicates = [];
+  const kept = [];
+  S.students.forEach(s => {
+    if (seen.has(s.key)){ S.duplicates.push(s); return; }
+    seen.add(s.key);
+    s.pays = byKey.get(s.key) || [];
+    s.received = s.pays.reduce((a, p) => a + p.amount, 0);
+    s.pending = Math.max(s.agreed - s.received, 0);
+    s.excess = Math.max(s.received - s.agreed, 0);
+    kept.push(s);
+  });
+  S.students = kept;
+  S.unmatched = S.payments.filter(p => !seen.has(p.student));
+
+  S.batches = [...new Set([...listVals('batch'), ...S.students.map(s => s.batch).filter(Boolean)])];
+  S.years = [...new Set([...listVals('academicyear'), ...S.students.map(s => s.year), ...S.school.map(r => r.year)])].sort();
+
+  const now = new Date();
+  const current = fyLabel(fyOfDate(now));
+  if (!S.years.includes(st.year)) st.year = S.years.includes(current) ? current : (S.years[S.years.length - 1] || '');
+  if (!S.years.includes(st.cmp) || st.cmp === st.year) st.cmp = defaultCompare();
+  st.open = new Set();
+}
+
+function defaultCompare(){
+  const prev = fyLabel(fyStart(st.year) - 1);
+  if (S.years.includes(prev)) return prev;
+  return S.years.filter(y => y !== st.year).pop() || '';
+}
+
+// ===== calculations =====
+const pendEff = s => (st.excludeLeft && s.status === 'Left') ? 0 : s.pending;
+
+function yearTotals(y){
+  const rows = S.students.filter(s => s.year === y);
+  const agreed = rows.reduce((a, s) => a + s.agreed, 0);
+  const received = rows.reduce((a, s) => a + s.received, 0);
+  const pending = rows.reduce((a, s) => a + pendEff(s), 0);
+  const school = S.school.filter(r => r.year === y).reduce((a, r) => a + r.amount, 0);
+  return { agreed, received, pending, school, total: received + school, count: rows.length };
+}
+
+// tuition by payment date, 12 slots Apr–Mar of academic year `label`
+function tuitionByMonth(label){
+  const out = new Array(12).fill(0);
+  S.payments.forEach(p => {
+    if (!p.date) return;
+    if (fyLabel(fyOfDate(p.date)) !== label) return;
+    out[(p.date.getMonth() + 9) % 12] += p.amount;
+  });
+  return out;
+}
+function schoolByMonth(label){
+  const out = new Array(12).fill(0);
+  S.school.forEach(r => { if (r.year === label) out[r.month] += r.amount; });
+  return out;
+}
+
+// ===== controls =====
+function setView(view){
+  st.view = view;
+  document.querySelectorAll('#nav button').forEach(b => b.classList.toggle('active', b.dataset.view === view));
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  $('view' + view.charAt(0).toUpperCase() + view.slice(1)).classList.add('active');
+  renderView();
+}
+
+function onControlClick(e){
+  const b = e.target.closest('button');
+  if (!b) return;
+  if (b.dataset.year){
+    st.year = b.dataset.year;
+    st.cmp = defaultCompare();
+    st.batch = 'All'; st.open = new Set();
+    renderAll();
+  } else if (b.id === 'leftToggle'){
+    st.excludeLeft = !st.excludeLeft;
+    renderAll();
+  }
+}
+
+function onViewClick(e){
+  const batchRow = e.target.closest('[data-batch-row]');
+  if (batchRow){
+    st.batch = batchRow.dataset.batchRow;
+    setView('students');
+    return;
+  }
+  const pill = e.target.closest('button[data-batch]');
+  if (pill){ st.batch = pill.dataset.batch; renderStudents(); return; }
+  const po = e.target.closest('#pendingOnlyBtn');
+  if (po){ st.pendingOnly = !st.pendingOnly; renderStudents(); return; }
+  const th = e.target.closest('th[data-sort]');
+  if (th){
+    const k = th.dataset.sort;
+    if (st.sortKey === k) st.sortDir = -st.sortDir;
+    else { st.sortKey = k; st.sortDir = (k === 'name' || k === 'batch') ? 1 : -1; }
+    renderStudents();
+    return;
+  }
+  const row = e.target.closest('tr[data-key]');
+  if (row){
+    const k = row.dataset.key;
+    if (st.open.has(k)) st.open.delete(k); else st.open.add(k);
+    renderStudents();
+  }
+}
+
+// ===== render =====
+function renderAll(){
+  renderControls();
+  renderWarnings();
+  renderView();
+}
+
+function renderControls(){
+  const pills = S.years.map(y => `<button data-year="${escapeHtml(y)}" class="${y === st.year ? 'active' : ''}">${escapeHtml(y)}</button>`).join('');
+  $('yearPills').innerHTML = pills + '<span class="gap"></span>' +
+    `<button id="leftToggle" class="${st.excludeLeft ? 'active' : ''}">${st.excludeLeft ? 'Pending excludes Left students' : 'Pending includes Left students'}</button>`;
+}
+
+function renderWarnings(){
+  const parts = [];
+  if (S.unmatched.length){
+    const total = S.unmatched.reduce((a, p) => a + p.amount, 0);
+    parts.push(`<details class="warn"><summary>${S.unmatched.length} payment${S.unmatched.length === 1 ? '' : 's'} (${rs(total)}) not linked to any student</summary><ul>` +
+      S.unmatched.map(p => `<li>${escapeHtml(fmtDay(p.date))} · ${escapeHtml(p.student)} · ${fmt(p.amount)}</li>`).join('') + '</ul></details>');
+  }
+  if (S.duplicates.length){
+    parts.push(`<details class="warn"><summary>${S.duplicates.length} repeated student row${S.duplicates.length === 1 ? '' : 's'} in the Students tab, ignored (only the first is counted)</summary><ul>` +
+      S.duplicates.map(s => `<li>${escapeHtml(s.key)}</li>`).join('') + '</ul></details>');
+  }
+  $('warnings').innerHTML = parts.join('');
+}
+
+function renderView(){
+  if (!st.loaded) return;
+  if (st.view === 'summary') renderSummary();
+  else if (st.view === 'students') renderStudents();
+  else if (st.view === 'school') renderSchool();
+  else if (st.view === 'compare') renderCompare();
+}
+
+function renderSummary(){
+  const t = yearTotals(st.year);
+  const rows = S.students.filter(s => s.year === st.year);
+  if (!rows.length && !t.school){
+    $('viewSummary').innerHTML = `<div class="empty">Nothing entered for ${escapeHtml(st.year)} yet.</div>`;
+    return;
+  }
+
+  const batches = S.batches.filter(b => rows.some(s => s.batch === b));
+  const batchRows = batches.map(b => {
+    const rs_ = rows.filter(s => s.batch === b);
+    const agreed = rs_.reduce((a, s) => a + s.agreed, 0);
+    const received = rs_.reduce((a, s) => a + s.received, 0);
+    const pending = rs_.reduce((a, s) => a + pendEff(s), 0);
+    const pct = agreed > 0 ? Math.min(received / agreed * 100, 100) : 0;
+    return `<tr class="click" data-batch-row="${escapeHtml(b)}">
+      <td class="l">${escapeHtml(b)}</td><td>${rs_.length}</td><td>${fmt(agreed)}</td>
+      <td class="rec">${fmt(received)}</td><td class="pend">${cell(pending)}</td>
+      <td>${pct.toFixed(0)}%<span class="bar"><i style="width:${pct}%"></i></span></td></tr>`;
+  }).join('');
+
+  $('viewSummary').innerHTML = `
+    <div class="summary-row">
+      <div class="stat rec"><div class="num">${rs(t.total)}</div><div class="lbl">TOTAL RECEIVED</div></div>
+      <div class="stat pend"><div class="num">${rs(t.pending)}</div><div class="lbl">PENDING</div></div>
+      <div class="stat"><div class="num">${rs(t.received)}</div><div class="lbl">TUITION RECEIVED</div></div>
+      <div class="stat"><div class="num">${rs(t.school)}</div><div class="lbl">FROM SCHOOL</div></div>
+    </div>
+
+    <h2>By source</h2>
+    <div class="tblwrap"><table class="ledger">
+      <thead><tr><th class="l">Source</th><th>Agreed</th><th>Received</th><th>Pending</th></tr></thead>
+      <tbody>
+        <tr><td class="l">Tuition</td><td>${fmt(t.agreed)}</td><td class="rec">${fmt(t.received)}</td><td class="pend">${cell(t.pending)}</td></tr>
+        <tr><td class="l">School</td><td class="dim">–</td><td class="rec">${fmt(t.school)}</td><td class="dim">–</td></tr>
+        <tr class="total"><td class="l">Total</td><td></td><td class="rec">${fmt(t.total)}</td><td class="pend">${cell(t.pending)}</td></tr>
+      </tbody>
+    </table></div>
+
+    <h2>By batch</h2>
+    <div class="tblwrap"><table class="ledger">
+      <thead><tr><th class="l">Batch</th><th>Students</th><th>Agreed</th><th>Received</th><th>Pending</th><th>Collected</th></tr></thead>
+      <tbody>${batchRows || '<tr><td colspan="6" class="empty">No students for this year.</td></tr>'}</tbody>
+      <tbody><tr class="total"><td class="l">Total</td><td>${t.count}</td><td>${fmt(t.agreed)}</td><td class="rec">${fmt(t.received)}</td><td class="pend">${cell(t.pending)}</td><td></td></tr></tbody>
+    </table></div>`;
+}
+
+function renderStudents(){
+  const all = S.students.filter(s => s.year === st.year);
+  if (!all.length){
+    $('viewStudents').innerHTML = `<div class="empty">No students entered for ${escapeHtml(st.year)} yet.</div>`;
+    return;
+  }
+  const batches = S.batches.filter(b => all.some(s => s.batch === b));
+  if (st.batch !== 'All' && !batches.includes(st.batch)) st.batch = 'All';
+  const q = st.q.trim().toLowerCase();
+
+  let rows = all.filter(s =>
+    (st.batch === 'All' || s.batch === st.batch) &&
+    (!q || s.name.toLowerCase().includes(q)) &&
+    (!st.pendingOnly || pendEff(s) > 0));
+
+  const val = { name: s => s.name.toLowerCase(), batch: s => s.batch.toLowerCase(), agreed: s => s.agreed, received: s => s.received, pending: s => pendEff(s) };
+  const f = val[st.sortKey];
+  rows = rows.slice().sort((a, b) => {
+    const x = f(a), y = f(b);
+    const c = x < y ? -1 : x > y ? 1 : 0;
+    return c * st.sortDir || a.name.localeCompare(b.name);
+  });
+
+  const arrow = k => st.sortKey === k ? (st.sortDir > 0 ? ' ▲' : ' ▼') : '';
+  const body = rows.map(s => {
+    const open = st.open.has(s.key);
+    const chips = (s.status === 'Left' ? '<span class="chip left">Left</span>' : '') +
+                  (s.excess ? `<span class="chip excess">Excess ${fmt(s.excess)}</span>` : '');
+    const main = `<tr class="click" data-key="${escapeHtml(s.key)}">
+      <td class="l">${open ? '▾' : '▸'} ${escapeHtml(s.name)}${chips}</td>
+      <td class="l" style="font-weight:400">${escapeHtml(s.batch)}</td>
+      <td>${fmt(s.agreed)}</td><td class="rec">${fmt(s.received)}</td><td class="pend">${cell(pendEff(s))}</td></tr>`;
+    if (!open) return main;
+
+    let running = s.agreed;
+    const pays = s.pays.length ? `<table class="inner"><thead><tr><th class="l">Date</th><th>Amount</th><th class="l">Mode</th><th class="l">Note</th><th>Balance after</th></tr></thead><tbody>` +
+      s.pays.map(p => { running -= p.amount; return `<tr><td class="l">${escapeHtml(fmtDay(p.date))}</td><td class="rec">${fmt(p.amount)}</td><td class="l">${escapeHtml(p.mode)}</td><td class="l">${escapeHtml(p.note)}</td><td>${fmt(Math.max(running, 0))}</td></tr>`; }).join('') +
+      '</tbody></table>' : '<div class="dim">No payments yet.</div>';
+    return main + `<tr class="detail"><td colspan="5">${s.remarks ? `<div class="remarks">${escapeHtml(s.remarks)}</div>` : ''}${pays}</td></tr>`;
+  }).join('');
+
+  const tAgreed = rows.reduce((a, s) => a + s.agreed, 0);
+  const tRec = rows.reduce((a, s) => a + s.received, 0);
+  const tPend = rows.reduce((a, s) => a + pendEff(s), 0);
+
+  $('viewStudents').innerHTML = `
+    <div class="periods">
+      <button data-batch="All" class="${st.batch === 'All' ? 'active' : ''}">All</button>
+      ${batches.map(b => `<button data-batch="${escapeHtml(b)}" class="${st.batch === b ? 'active' : ''}">${escapeHtml(b)}</button>`).join('')}
+      <button id="pendingOnlyBtn" class="${st.pendingOnly ? 'active' : ''}">Pending only</button>
+      <span class="gap"></span>
+      <input type="text" id="searchBox" placeholder="Search student" value="${escapeHtml(st.q)}">
+    </div>
+    <div class="tblwrap"><table class="ledger">
+      <thead><tr>
+        <th class="l sortable" data-sort="name">Student${arrow('name')}</th>
+        <th class="l sortable" data-sort="batch">Batch${arrow('batch')}</th>
+        <th class="sortable" data-sort="agreed">Agreed${arrow('agreed')}</th>
+        <th class="sortable" data-sort="received">Received${arrow('received')}</th>
+        <th class="sortable" data-sort="pending">Pending${arrow('pending')}</th>
+      </tr></thead>
+      <tbody>${body || '<tr><td colspan="5" class="empty">No students match.</td></tr>'}</tbody>
+      <tbody><tr class="total"><td class="l">${rows.length} student${rows.length === 1 ? '' : 's'}</td><td></td><td>${fmt(tAgreed)}</td><td class="rec">${fmt(tRec)}</td><td class="pend">${cell(tPend)}</td></tr></tbody>
+    </table></div>`;
+}
+
+function renderSchool(){
+  const recs = S.school.filter(r => r.year === st.year);
+  if (!recs.length){
+    $('viewSchool').innerHTML = `<div class="empty">No school receipts entered for ${escapeHtml(st.year)} yet.</div>`;
+    return;
+  }
+  let total = 0, count = 0;
+  const body = MONTHS.map((m, i) => {
+    const rr = recs.filter(r => r.month === i);
+    const label = `${m} ${slotYear(st.year, i)}`;
+    if (!rr.length) return `<tr><td class="l dim">${label}</td><td class="dim">–</td><td class="dim">–</td><td class="l"></td></tr>`;
+    const amt = rr.reduce((a, r) => a + r.amount, 0);
+    total += amt; count++;
+    const dates = rr.map(r => r.date).filter(Boolean).sort((a, b) => a - b);
+    const last = dates[dates.length - 1];
+    const monthEnd = new Date(slotYear(st.year, i), slotMonth(i) + 1, 0);
+    const late = last && last > monthEnd ? '<span class="chip late">Late</span>' : '';
+    const note = rr.map(r => r.note).filter(Boolean).join('; ');
+    return `<tr><td class="l">${label}</td><td class="rec">${fmt(amt)}</td><td>${escapeHtml(fmtDay(last))}</td><td class="l" style="font-weight:400">${late}${note ? ` <span class="dim">${escapeHtml(note)}</span>` : ''}</td></tr>`;
+  }).join('');
+
+  $('viewSchool').innerHTML = `
+    <div class="summary-row">
+      <div class="stat rec"><div class="num">${rs(total)}</div><div class="lbl">RECEIVED FROM SCHOOL</div></div>
+      <div class="stat"><div class="num">${count}</div><div class="lbl">MONTHS RECEIVED</div></div>
+    </div>
+    <div class="tblwrap"><table class="ledger">
+      <thead><tr><th class="l">Month</th><th>Amount</th><th>Date received</th><th class="l"></th></tr></thead>
+      <tbody>${body}</tbody>
+      <tbody><tr class="total"><td class="l">Total</td><td class="rec">${fmt(total)}</td><td></td><td></td></tr></tbody>
+    </table></div>`;
+}
+
+function renderCompare(){
+  const others = S.years.filter(y => y !== st.year);
+  if (!others.length){
+    $('viewCompare').innerHTML = `<div class="empty">Add another academic year to compare.</div>`;
+    return;
+  }
+  if (!others.includes(st.cmp)) st.cmp = defaultCompare();
+  const a = st.cmp, b = st.year;
+
+  const yearRows = S.years.map(y => {
+    const t = yearTotals(y);
+    const cls = y === b ? 'sel' : y === a ? 'cmp' : '';
+    return `<tr class="${cls}"><td class="l">${escapeHtml(y)}</td><td>${fmt(t.agreed)}</td><td class="rec">${fmt(t.received)}</td><td class="pend">${cell(t.pending)}</td><td class="rec">${fmt(t.school)}</td><td class="rec" style="font-weight:700">${fmt(t.total)}</td></tr>`;
+  }).join('');
+
+  const tA = tuitionByMonth(a), tB = tuitionByMonth(b);
+  const sA = schoolByMonth(a), sB = schoolByMonth(b);
+  const cur = fyLabel(fyOfDate(new Date()));
+  const cutoff = b === cur ? (new Date().getMonth() + 9) % 12 : 11;
+
+  const sum = (arr, to) => arr.slice(0, to + 1).reduce((x, y) => x + y, 0);
+  const monthRows = MONTHS.map((m, i) => {
+    const totA = tA[i] + sA[i], totB = tB[i] + sB[i];
+    return `<tr><td class="l">${m}</td><td>${cell(tA[i])}</td><td>${cell(tB[i])}</td><td>${cell(sA[i])}</td><td>${cell(sB[i])}</td><td>${cell(totA)}</td><td>${cell(totB)}</td><td>${(totA || totB) ? signed(totB - totA) : '<span class="dim">–</span>'}</td></tr>`;
+  }).join('');
+  const fullA = sum(tA, 11) + sum(sA, 11), fullB = sum(tB, 11) + sum(sB, 11);
+  const toDate = cutoff < 11 ? (() => {
+    const ta = sum(tA, cutoff) + sum(sA, cutoff), tb = sum(tB, cutoff) + sum(sB, cutoff);
+    return `<tr class="total"><td class="l">Apr–${MONTHS[cutoff]} (to date)</td><td>${fmt(sum(tA, cutoff))}</td><td>${fmt(sum(tB, cutoff))}</td><td>${fmt(sum(sA, cutoff))}</td><td>${fmt(sum(sB, cutoff))}</td><td>${fmt(ta)}</td><td>${fmt(tb)}</td><td>${signed(tb - ta)}</td></tr>`;
+  })() : '';
+
+  $('viewCompare').innerHTML = `
+    <div class="periods">
+      <span class="label">${escapeHtml(b)} compared with</span>
+      <select id="cmpSelect">${others.map(y => `<option value="${escapeHtml(y)}" ${y === a ? 'selected' : ''}>${escapeHtml(y)}</option>`).join('')}</select>
+    </div>
+
+    <h2>Month by month</h2>
+    <div class="tblwrap"><table class="ledger">
+      <thead><tr><th class="l">Month</th><th>Tuition ${escapeHtml(a)}</th><th>Tuition ${escapeHtml(b)}</th><th>School ${escapeHtml(a)}</th><th>School ${escapeHtml(b)}</th><th>Total ${escapeHtml(a)}</th><th>Total ${escapeHtml(b)}</th><th>Change</th></tr></thead>
+      <tbody>${monthRows}</tbody>
+      <tbody>
+        ${toDate}
+        <tr class="total"><td class="l">Full year</td><td>${fmt(sum(tA, 11))}</td><td>${fmt(sum(tB, 11))}</td><td>${fmt(sum(sA, 11))}</td><td>${fmt(sum(sB, 11))}</td><td>${fmt(fullA)}</td><td>${fmt(fullB)}</td><td>${signed(fullB - fullA)}</td></tr>
+      </tbody>
+    </table></div>
+
+    <h2>All years</h2>
+    <div class="tblwrap"><table class="ledger">
+      <thead><tr><th class="l">Year</th><th>Tuition agreed</th><th>Tuition received</th><th>Tuition pending</th><th>School received</th><th>Total received</th></tr></thead>
+      <tbody>${yearRows}</tbody>
+    </table></div>`;
+}
+</script>
+</body>
+</html>
